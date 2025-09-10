@@ -1,6 +1,9 @@
 ﻿using BepInEx;
-using Unity;
+using EFT;
 using UnityEngine;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace ombarella
 {
@@ -19,7 +22,7 @@ namespace ombarella
         {
             Initialize();
         }
-
+        Player _mainPlayer;
         void Initialize()
         {
             _sampleCam = new Camera();
@@ -36,6 +39,17 @@ namespace ombarella
              * and that is something like (r * .2) + (g * .7) + (b * .1)
              * and that will give you human perceived brightness.
              */
+            _mainPlayer = Utils.GetMainPlayer();
+        }
+
+        void Update()
+        {
+            SetCameraToPlayer();
+        }
+
+        void SetCameraToPlayer()
+        {
+            _sampleCam.transform.position = _mainPlayer.Position;
         }
     }
 }
