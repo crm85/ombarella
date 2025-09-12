@@ -28,7 +28,7 @@ public class LightMeasure : MonoBehaviour
     {
         _lightCam = new Camera();
         _lightCam = gameObject.AddComponent<Camera>(); ;
-        rt = new(rectSize, rectSize, 1);
+        rt = new RenderTexture(rectSize, rectSize, 1);
         _lightCam.targetTexture = rt;
         tex = new Texture2D(rt.width, rt.height);
         rectReadPicture = new Rect(0, 0, rt.width, rt.height);
