@@ -10,3 +10,7 @@
 .vs/ombarella/v17/DocumentLayout.json
 .vs/ombarella/FileContentIndex/6bfd3f33-3597-426d-ba1c-1fcc343e0f91.vsidx
 *.vsidx
+.vs/ombarella/CopilotIndices/17.14.1147.5054/CodeChunks.db
+.vs/ombarella/CopilotIndices/17.14.1147.5054/SemanticSymbols.db
+.vs/ombarella/v17/DocumentLayout.backup.json
+obj/Debug/ombarella.csproj.AssemblyReference.cache
