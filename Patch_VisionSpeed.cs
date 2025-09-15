@@ -30,6 +30,7 @@ namespace ombarella
                     //__result /= sainMod;
                     //enemy.Vision.LastGainSightResult = __result;
                     __result *= Plugin.SightDebug.Value;
+                    __result *= Plugin.Instance.LightMeasure;
                 }
             }
         }
