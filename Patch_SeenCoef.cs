@@ -29,7 +29,21 @@ namespace ombarella
         [PatchPostfix]
         public static void PatchPostfix(EnemyInfo __instance, BifacialTransform BotTransform, BifacialTransform enemy, float personalLastSeenTime, Vector3 personalLastSeenPos, ref float __result)
         {
+            /*
+             * if (player.DebugInfo != null)
+		    {
+			    if (ShouldLogSeenCoef())
+			    {
+				    player.DebugInfo.lastCalcTo8 = __result;
+				    player.DebugInfo.lastFactor2 = num34;
+				    player.DebugInfo.rawTerrainScoreSample = num46;
+			    }
+			    player.DebugInfo.calced++;
+			    player.DebugInfo.calcedLastFrame++;
+		    }
+            */
 
+            // ^^ this seems like the final setting
         }
     }
 }
