@@ -3,26 +3,29 @@ using BepInEx.Configuration;
 using EFT;
 using SPT.Reflection.Patching;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.Rendering;
-using static System.Net.Mime.MediaTypeNames;
+using Unity;
+using Random = UnityEngine.Random;
 
 namespace ombarella
 {
     [BepInPlugin(modGUID, modName, modVersion)]
     public class Plugin : BaseUnityPlugin
     {
+        public static Plugin Instance;
+
         const string modGUID = "Ombarella";
         const string modName = "Ombarella";
         const string modVersion = "0.1";
 
-        Camera _sampleCam;
-        Material _renderMat;
-        RenderTexture _renderTex;
-        public static Plugin Instance;
+        Player _player;
+        Camera _lightCam;
+        RenderTexture rt;
+        Texture2D tex;
+        Rect rectReadPicture;
+        int rectSize = 8;
+        bool _isRaidRunning = false;
 
         void Awake()
         {
@@ -30,44 +33,35 @@ namespace ombarella
             Initialize();
         }
 
-        Player _mainPlayer;
-        bool _raidRunning = false;
-        float _seenCoefModified = 0;
-
-
-
-        public static ConfigEntry<float> SightDebug;
-        public static ConfigEntry<float> AddX;
-        public static ConfigEntry<float> AddY;
-        public static ConfigEntry<float> AddZ;
+        // config values
+        public static ConfigEntry<float> DetectionMultiplier;
         public static ConfigEntry<float> SamplesPerSecond;
+        public static ConfigEntry<float> SampleRandomizer;
 
+        // debug values
+        public static ConfigEntry<float> AddXCam;
+        public static ConfigEntry<float> AddYCam;
+        public static ConfigEntry<float> AddZCam;
+        public static ConfigEntry<float> AddYPlayer;
+        public static ConfigEntry<float> CameraFOV;
+        public static ConfigEntry<float> meterMulti;
+
+        public static ConfigEntry<float> DebugUpdateFreq;
+        public static ConfigEntry<bool> IsDebugging;
+
+        static Vector3 _rigPos1 = new Vector3(1f, 0.2f, 0);
+        static Vector3 _rigPos2 = new Vector3(-0.5f, 0.2f, -1f);
+        static Vector3 _rigPos3 = new Vector3(-0.5f, 0.2f, 1f);
+        static int _rigCount = 1;
 
         void Initialize()
         {
             Utils.Logger = this.Logger;
 
+            LoadConfig();
             SetupCamera();
-            //_sampleCam = new Camera();
-            //_renderMat = new Material(Shader.Find("Standard"));
-            //_renderTex = new RenderTexture(200, 200, 5);
-            //int nameID = _renderTex.GetInstanceID();
-            //_renderMat.SetTexture(nameID, _renderTex);
-
-            /*
-             * Render Textures seem the way to go, 
-             * you can get a Camera to Render to it 
-             * then have a C# script go over the pixels
-             * and calculate either Value that is the 
-             * highest channel of the 3 or Luminosity 
-             * and that is something like (r * .2) + (g * .7) + (b * .1)
-             * and that will give you human perceived brightness.
-             */
-            _mainPlayer = Utils.GetMainPlayer();
 
             TryLoadPatch(new Patch_VisionSpeed());
-
-            LoadConfig();
         }
 
         void TryLoadPatch(ModulePatch patch)
@@ -85,26 +79,42 @@ namespace ombarella
 
         void LoadConfig()
         {
-            SightDebug = ConstructFloatConfig(1.0f, "z - Debug", "Sight Debug", "", 0.01f, 10f);
-            AddX = ConstructFloatConfig(0, "z - Debug", "AddX", "", 0, 10f);
-            AddY = ConstructFloatConfig(0, "z - Debug", "AddY", "", 0, 10f);
-            AddZ = ConstructFloatConfig(0, "z - Debug", "AddZ", "", 0, 10f);
-            SamplesPerSecond = ConstructFloatConfig(1f, "a - Settings", "Samples per second", "", 1f, 20f);
+            SamplesPerSecond = ConstructFloatConfig(1.5f, "a - Settings", "Samples per second", "How many times per second the light meter is sampled; affects performance a lot", 1f, 20f);
+            DetectionMultiplier = ConstructFloatConfig(1.0f, "a - Settings", "Light meter strength", "Modify how much bots are affected by the light meter (lower = you become harder to detect in low light)", 0.1f, 1f);
+            SampleRandomizer = ConstructFloatConfig(0.15f, "a - Settings", "Sample Randomizer", "Percentage change that pixel analysis will be skipped on a given pass; essentially a performance tool. 0 = zero % chance of sample, 1 = guaranteed sample", 0f, 1f);
+            CameraFOV = ConstructFloatConfig(90f, "a - Settings", "CameraFOV", "", 10f, 170f);
+            
+            AddXCam = ConstructFloatConfig(0, "z - Debug", "AddXCam", "", 0, 10f);
+            AddYCam = ConstructFloatConfig(0, "z - Debug", "AddYCam", "", 0, 10f);
+            AddZCam = ConstructFloatConfig(0, "z - Debug", "AddZCam", "", 0, 10f);
+            AddYPlayer = ConstructFloatConfig(0, "z - Debug", "AddYPlayer", "", 0, 10f);
+            meterMulti = ConstructFloatConfig(10f, "z - Debug", "meterMulti", "", 1f, 20f);
+
+            DebugUpdateFreq = ConstructFloatConfig(1f, "z - Debug", "Debug update frequency (/sec)", "", 1f, 10f);
+            IsDebugging = ConstructBoolConfig(false, "z - Debug", "Enable debug logging", "");
         }
 
         void Update()
         {
-            UpdateLight();
-            AdjustCamera();
-            //if (_raidRunning)
+            Utils.UpdateDebug(Time.deltaTime);
+            //if (!Utils.IsInRaid())
             //{
-
+            //    return;
             //}
-        }
-
-        void SetCameraToPlayer()
-        {
-            _sampleCam.transform.position = _mainPlayer.Position;
+            if (_player == null)
+            {
+                _player = Utils.GetMainPlayer();
+            }
+            if (_player == null)
+            {
+                Utils.LogError("Unable to return player, meter updates aborted");
+                return;
+            }
+            //
+            // good to update meter
+            //
+            UpdateLightMeter();
+            RepositionCamera();
         }
 
         ConfigEntry<float> ConstructFloatConfig(float defaultValue, string category, string descriptionShort, string descriptionFull, float min, float max)
@@ -119,21 +129,11 @@ namespace ombarella
             return result;
         }
 
-
-        public static readonly LayerMask PlayerCollisionsMask = GClass1403.GetAllCollisionsLayerMask(LayerMaskClass.PlayerLayer);
-
-
-        private Texture2D tex;
-        private Rect rectReadPicture;
-        Camera _lightCam;
-        RenderTexture rt;
-        int rectSize = 8;
-
         private void SetupCamera()
         {
             _lightCam = new Camera();
             _lightCam = gameObject.AddComponent<Camera>();
-            rt = new RenderTexture(rectSize, rectSize, 0);
+            rt = new RenderTexture(rectSize, rectSize, 1);
             rt.dimension = TextureDimension.Tex2D;
             rt.wrapMode = TextureWrapMode.Clamp;
             _lightCam.targetTexture = rt;
@@ -141,48 +141,83 @@ namespace ombarella
             rectReadPicture = new Rect(0, 0, rt.width, rt.height);
         }
 
-        Player _player;
-        private void UpdateLight()
+        private void UpdateLightMeter()
         {
-            if (_player == null)
-            {
-                _player = Utils.GetMainPlayer();
-            }
-            if (_player == null)
-            {
-                return;
-            }
-
-            AdjustCamera();
-            // MeasureSinglePixel();
+            _lightCam.fieldOfView = CameraFOV.Value;
             if (IsReadyForUpdate())
             {
-                MeasureAllPixels();
+                Utils.Log("ready for update", false);
+                RepositionCamera();
+                AddMeasurementToAverage(MeasureRenderTex());
+                ClampFinalValue();
             }
         }
 
-        void AdjustCamera()
+        float _lightMeterPool = 0f;
+        float _avgLightMeter = 0.01f;
+        public float FinalLightMeter = 0.01f;
+
+        void AddMeasurementToAverage(float newMeasurement)
         {
-            if (_player == null)
-            { return; }
-            // _lightCam.gameObject.transform.position = _cameraPos;
-            // _lightCam.gameObject.transform.rotation = Quaternion.Euler(_cameraRot);
-            Vector3 relativePos = _player.Position - transform.position;
-            _lightCam.gameObject.transform.rotation = Quaternion.LookRotation(relativePos);
-            Vector3 newPos = _player.Position;
-            newPos.x += Plugin.AddX.Value;
-            newPos.y += Plugin.AddY.Value;
-            newPos.z += Plugin.AddZ.Value;
-            _lightCam.gameObject.transform.position = newPos;
+            newMeasurement = Mathf.Clamp(newMeasurement, 0.01f, 0.1f);
+            newMeasurement *= meterMulti.Value;
+            // here the average changes, which is the principal output of the mod
+            float ratio = SamplesPerSecond.Value;
+            _lightMeterPool -= _avgLightMeter;
+            _lightMeterPool += newMeasurement;
+            _avgLightMeter = _lightMeterPool / ratio;
+            Utils.Log($"_lightMeterPool : {_lightMeterPool} || newMeasurement {newMeasurement} || _avgLightMeter : {_avgLightMeter}", true);
+        }
+
+        void ClampFinalValue()
+        {
+            float finalValue = _avgLightMeter * DetectionMultiplier.Value;
+            finalValue *= Mathf.Clamp(_avgLightMeter, 0.1f, 1f);
+            FinalLightMeter = finalValue;
+            //Utils.Log($"final light output : {FinalLightMeter}", true);
+        }
+
+        void RepositionCamera()
+        {
+            Utils.Log("camera repos", false);
+
+            _rigCount++;
+            if (_rigCount > 3)
+            {
+                _rigCount = 1;
+            }
+            Vector3 rigNewPos;
+            switch (_rigCount)
+            {
+                case 1:
+                    rigNewPos = _rigPos1;
+                    break;
+                case 2:
+                    rigNewPos = _rigPos2;
+                    break;
+                default:
+                    rigNewPos = _rigPos3;
+                    break;
+            }
+
+            Vector3 playerPos = _player.Position;
+            playerPos.y += AddYPlayer.Value;
+            //Vector3 newCamPos = playerPos;
+            Vector3 newCamPos = playerPos + rigNewPos;
+            //newCamPos.x += Plugin.AddXCam.Value;
+            //newCamPos.y += Plugin.AddYCam.Value;
+            //newCamPos.z += Plugin.AddZCam.Value;
+            Vector3 vectorCameraToPlayer = playerPos - newCamPos;
+
+            _lightCam.gameObject.transform.rotation = Quaternion.LookRotation(vectorCameraToPlayer);
+            _lightCam.gameObject.transform.position = newCamPos;
         }
         
-
         float _timer = 0;
-        float _updateFrequency = 30f;
         bool IsReadyForUpdate()
         {
             _timer += Time.deltaTime;
-            float limit = SamplesPerSecond.Value / 1f;
+            float limit = 1f / SamplesPerSecond.Value;
             if (_timer > limit)
             {
                 _timer = _timer - limit;
@@ -190,32 +225,36 @@ namespace ombarella
             }
             return false;
         }
-
-        void MeasureAllPixels()
+        
+        float MeasureRenderTex()
         {
+            int passes = 0;
             float allGray = 0;
             RenderTexture.active = rt;
             for (int i = 0; i < rt.width; i++)
             {
                 for (int j = 0; j < rt.height; j++)
                 {
-                    tex.ReadPixels(rectReadPicture, i, j);
-                    tex.Apply();
+                    float random = Random.Range(0.0f, 1.0f);
+                    if (random < SampleRandomizer.Value)
+                    {
+                        Utils.Log($"taking sample", true);
 
-                    // Debug.Log(tex.GetPixel(i, j).grayscale);
-                    float gray = tex.GetPixel(i, j).grayscale;
-                    allGray += gray;
+                        tex.ReadPixels(rectReadPicture, i, j);
+                        tex.Apply();
+
+                        float gray = tex.GetPixel(i, j).grayscale;
+                        allGray += gray;
+                        passes++;
+                    }
                 }
             }
             RenderTexture.active = null;
             rt.Release();
 
-            float finalAverage = allGray / (rt.width * rt.height);
-            Debug.Log($"final average = {finalAverage}");
-            LightMeasure = finalAverage;
-            Utils.Log($"light measure = {finalAverage}");
+            float finalAverage = allGray / passes;
+            //Utils.Log($"render tex reading: {finalAverage}", true);
+            return finalAverage;
         }
-
-        public float LightMeasure = 1f;
     }
 }
