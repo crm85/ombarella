@@ -1,6 +1,7 @@
 ﻿using BepInEx.Logging;
 using Comfort.Common;
 using EFT;
+using UnityEngine;
 using Object = UnityEngine.Object;
 
 
@@ -10,6 +11,7 @@ namespace ombarella
     {
         static float _logUpdateTimer = 0;
         public static ManualLogSource Logger;
+        public static bool DebugViz { get; set; }
 
         public static Player GetMainPlayer()
         {
@@ -23,6 +25,10 @@ namespace ombarella
 
         public static void Log(string log, bool oneTimeLog)
         {
+            if (!Plugin.IsDebug.Value)
+            {
+                return;
+            }
             if (oneTimeLog)
             {
                 Logger.LogInfo((object)log);
@@ -45,16 +51,21 @@ namespace ombarella
         public static void UpdateDebug(float dt)
         {
             _logUpdateTimer += dt;
-            float limit = 1f / Plugin.SamplesPerSecond.Value;
-            if (_logUpdateTimer > limit)
+            float _logUpdateInterval = 1f / Plugin.SamplesPerSecond.Value;
+            if (_logUpdateTimer > _logUpdateInterval)
             {
-                _logUpdateTimer = _logUpdateTimer - Plugin.DebugUpdateFreq.Value;
+                _logUpdateTimer = _logUpdateTimer - _logUpdateInterval;
             }
         }
 
         public static bool IsInRaid()
         {
             return GClass2107.InRaid;
+        }
+
+        public static void DrawDebugLine(Vector3 from, Vector3 to)
+        {
+            Debug.DrawLine(from, to, Color.green);
         }
     }
 }
