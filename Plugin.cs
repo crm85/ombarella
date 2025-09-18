@@ -8,6 +8,7 @@ using UnityEngine.Rendering;
 using Unity;
 using Random = UnityEngine.Random;
 using Object = UnityEngine.Object;
+using System.Collections;
 
 namespace ombarella
 {
@@ -38,6 +39,7 @@ namespace ombarella
         public static ConfigEntry<float> DetectionMultiplier;
         public static ConfigEntry<float> SamplesPerSecond;
         public static ConfigEntry<float> SampleRandomizer;
+        public static ConfigEntry<float> PixelsPerFrame;
         public static ConfigEntry<bool> MeterViz;
 
         // debug values
@@ -90,7 +92,8 @@ namespace ombarella
             SamplesPerSecond = ConstructFloatConfig(1.5f, "a - Settings", "Samples per second", "How many times per second the light meter is sampled; affects performance a lot", 1f, 20f);
             DetectionMultiplier = ConstructFloatConfig(1.0f, "a - Settings", "Light meter strength", "Modify how much bots are affected by the light meter (lower = you become harder to detect in low light)", 0.1f, 1f);
             SampleRandomizer = ConstructFloatConfig(0.15f, "a - Settings", "Sample Randomizer", "Percentage change that pixel analysis will be skipped on a given pass; essentially a performance tool. 0 = zero % chance of sample, 1 = guaranteed sample", 0f, 1f);
-            CameraFOV = ConstructFloatConfig(90f, "a - Settings", "CameraFOV", "", 10f, 170f);
+            CameraFOV = ConstructFloatConfig(40f, "a - Settings", "CameraFOV", "", 10f, 170f);
+            PixelsPerFrame = ConstructFloatConfig(1f, "a - Settings", "Pixels scanned per frame", "", 1f, 60f);
             MeterViz = ConstructBoolConfig(false, "a - Settings", "Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are");
             
             IsDebug = ConstructBoolConfig(false, "y - Debug", "1) Enable debug logging", "");
@@ -126,7 +129,95 @@ namespace ombarella
             //
             // good to update meter
             //
-            UpdateLightMeter();
+            UpdateLightMeter_new();
+
+            
+        }
+        private void UpdateLightMeter()
+        {
+            _lightCam.fieldOfView = CameraFOV.Value;
+            if (IsReadyForUpdate())
+            {
+                Utils.Log("ready for update", false);
+                RepositionCamera();
+                AddMeasurementToAverage(MeasureRenderTex());
+                ClampFinalValue();
+            }
+        }
+
+        void UpdateLightMeter_new()
+        {
+            _lightCam.fieldOfView = CameraFOV.Value;
+            RepositionCamera();
+            if (!routineRunning)
+            {
+                StartCoroutine(LightMeterRoutine());
+            }
+        }
+
+        bool routineRunning = false;
+        float routineTIme = 0.5f;
+        IEnumerator LightMeterRoutine()
+        {
+            routineRunning = true;
+            float processTime = 0;
+
+            _lightCam.Render();
+
+            var oldRenderTexture = RenderTexture.active;
+            RenderTexture.active = rt;
+
+            var texture2D = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false);
+            texture2D.ReadPixels(new Rect(0, 0, texture2D.width, texture2D.height), 0, 0, false);
+            texture2D.Apply();
+
+            Color[] allColors = texture2D.GetPixels();
+
+            float totalLuminance = 0f;
+
+            int pixelsThisFrame = 0;
+            int i = 0;
+            while (i < allColors.Length)
+            {
+                Color color = allColors[i];
+                totalLuminance += (color.r * 0.2126f) + (color.g * 0.7152f) + (color.b * 0.0722f);
+                pixelsThisFrame++;
+
+                if (pixelsThisFrame == PixelsPerFrame.Value)
+                {
+                    pixelsThisFrame = 0;
+                    yield return new WaitForEndOfFrame();
+                    processTime += Time.deltaTime;
+                }
+
+                processTime += Time.deltaTime;
+                i++;
+            }
+
+            float averageLuminance = totalLuminance / allColors.Length;
+
+
+            RenderTexture.active = oldRenderTexture;
+            Object.Destroy(texture2D);
+
+            Utils.Log($"lumen {averageLuminance}", true);
+
+            UpdateMeter(averageLuminance, processTime);
+            routineRunning = false;
+        }
+
+        void UpdateMeter(float value, float processTime)
+        {
+            value = Mathf.Clamp(value, 0.01f, 0.1f);
+            value *= MeterMulti.Value;
+            // here the average changes, which is the principal output of the mod
+            float ratio = SamplesPerSecond.Value;
+            _lightMeterPool -= _avgLightMeter;
+            _lightMeterPool = Mathf.Clamp(_lightMeterPool, 0.01f, 10f);
+            _lightMeterPool += value;
+            _avgLightMeter = _lightMeterPool * processTime;
+            Utils.Log($"_lightMeterPool : {_lightMeterPool} || newMeasurement {value} || _avgLightMeter : {_avgLightMeter}", true);
+            ClampFinalValue();
         }
 
         ConfigEntry<float> ConstructFloatConfig(float defaultValue, string category, string descriptionShort, string descriptionFull, float min, float max)
@@ -155,17 +246,7 @@ namespace ombarella
             _lightCam.enabled = false;
         }
 
-        private void UpdateLightMeter()
-        {
-            _lightCam.fieldOfView = CameraFOV.Value;
-            if (IsReadyForUpdate())
-            {
-                Utils.Log("ready for update", false);
-                RepositionCamera();
-                AddMeasurementToAverage(MeasureRenderTex());
-                ClampFinalValue();
-            }
-        }
+        
 
         float _lightMeterPool = 0f;
         float _avgLightMeter = 0.01f;
