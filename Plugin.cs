@@ -49,6 +49,7 @@ namespace ombarella
         public static ConfigEntry<float> AddYPlayer;
         public static ConfigEntry<float> CameraFOV;
         public static ConfigEntry<float> MeterMulti;
+        public static ConfigEntry<float> LerpSpeed;
 
         public static ConfigEntry<float> DebugUpdateFreq;
         public static ConfigEntry<bool> IsDebug;
@@ -107,6 +108,7 @@ namespace ombarella
             AddZCam = ConstructFloatConfig(0, "z - Debug", "AddZCam", "", -1f, 1f);
             AddYPlayer = ConstructFloatConfig(0, "z - Debug", "AddYPlayer", "", 0, 10f);
             MeterMulti = ConstructFloatConfig(10f, "z - Debug", "meterMulti", "", 1f, 20f);
+            LerpSpeed = ConstructFloatConfig(1f, "z - Debug", "LerpSpeed", "", 1f, 20f);
 
         }
 
@@ -130,8 +132,9 @@ namespace ombarella
             // good to update meter
             //
             UpdateLightMeter_new();
+            CameraController.UpdateDebugLines();
 
-            
+
         }
         private void UpdateLightMeter()
         {
@@ -265,10 +268,13 @@ namespace ombarella
             Utils.Log($"_lightMeterPool : {_lightMeterPool} || newMeasurement {newMeasurement} || _avgLightMeter : {_avgLightMeter}", true);
         }
 
+        float _finalValueLerped = 0.01f;
+
         void ClampFinalValue()
         {
             float finalValue = _avgLightMeter * DetectionMultiplier.Value;
             finalValue *= Mathf.Clamp(_avgLightMeter, 0.1f, 1f);
+            _finalValueLerped = Mathf.Lerp(_finalValueLerped, finalValue, Time.deltaTime * LerpSpeed.Value);
             FinalLightMeter = finalValue;
             //Utils.Log($"final light output : {FinalLightMeter}", true);
         }

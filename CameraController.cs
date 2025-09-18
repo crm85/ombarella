@@ -25,8 +25,17 @@ namespace ombarella
             Vector3 vectorCameraToPlayer = playerPosAdjusted - newCamPos;
             _lightCam.gameObject.transform.position = newCamPos;
             _lightCam.gameObject.transform.rotation = Quaternion.LookRotation(vectorCameraToPlayer);
+            linePos1 = newCamPos;
+            linePos2 = newCamPos + vectorCameraToPlayer;
+        }
 
-            Utils.DrawDebugLine(newCamPos, newCamPos + vectorCameraToPlayer);
+        static Vector3 linePos1 = Vector3.zero;
+        static Vector3 linePos2 = Vector3.zero;
+
+        public static void UpdateDebugLines()
+        {
+            Utils.DrawDebugLine(linePos1, linePos2);
+
         }
     }
 }
