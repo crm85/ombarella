@@ -35,9 +35,11 @@ namespace ombarella
             }
             else
             {
-                float limit = 1f / Plugin.SamplesPerSecond.Value;
-                if (_logUpdateTimer > limit)
+                _logUpdateTimer += Time.deltaTime;
+                float logUpdateInterval = 1f / Plugin.DebugUpdateFreq.Value;
+                if (_logUpdateTimer > logUpdateInterval)
                 {
+                    _logUpdateTimer = 0;
                     Logger.LogInfo((object)log);
                 }
             }
@@ -48,14 +50,14 @@ namespace ombarella
             Logger.LogError((object)error);
         }
 
-        public static void UpdateDebug(float dt)
+        public static void Update(float dt)
         {
-            _logUpdateTimer += dt;
-            float _logUpdateInterval = 1f / Plugin.SamplesPerSecond.Value;
-            if (_logUpdateTimer > _logUpdateInterval)
-            {
-                _logUpdateTimer = _logUpdateTimer - _logUpdateInterval;
-            }
+            //_logUpdateTimer += dt;
+            //float logUpdateInterval = 1f / Plugin.DebugUpdateFreq.Value;
+            //if (_logUpdateTimer > logUpdateInterval)
+            //{
+            //    _logUpdateTimer = _logUpdateTimer - logUpdateInterval;
+            //}
         }
 
         public static bool IsInRaid()

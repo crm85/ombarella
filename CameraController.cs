@@ -13,15 +13,15 @@ namespace ombarella
         public static void RepositionCamera()
         {
             Vector3 playerPosAdjusted = Utils.GetMainPlayer().Position;
-            playerPosAdjusted.y += Plugin.AddYPlayer.Value;
+            playerPosAdjusted.y += Plugin.Instance.AddYPlayer;
             float randomAngle = Random.Range(1f, 360f);
             Quaternion cameraAngleYAxis = Quaternion.AngleAxis(randomAngle, Vector3.up);
             Vector3 posOffsetFromPlayer = playerPosAdjusted;
-            posOffsetFromPlayer.x += Plugin.CamDistanceOffset.Value;
+            posOffsetFromPlayer.x += Plugin.Instance.CamDistanceOffset;
             Vector3 direction = posOffsetFromPlayer - playerPosAdjusted;
             Vector3 rotDirection = cameraAngleYAxis * direction;
             Vector3 newCamPos = playerPosAdjusted + rotDirection;
-            newCamPos.y += Plugin.CamVerticalOffset.Value;
+            newCamPos.y += Plugin.Instance.CamVerticalOffset;
             Vector3 vectorCameraToPlayer = playerPosAdjusted - newCamPos;
             _lightCam.gameObject.transform.position = newCamPos;
             _lightCam.gameObject.transform.rotation = Quaternion.LookRotation(vectorCameraToPlayer);

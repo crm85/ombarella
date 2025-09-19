@@ -7,11 +7,21 @@ using UnityEngine;
 
 namespace ombarella
 {
-    public class PluginManager : MonoBehaviour
+    public static class PluginManager
     {
-        void Start()
+        static bool _isRaidLastFrame = false;
+        public static void Update()
         {
-            // things
+            bool isRaidThisFrame = Utils.IsInRaid();
+            if (_isRaidLastFrame && !isRaidThisFrame)
+            {
+                Plugin.Instance.CleanupRaid();
+            }
+            else if (!_isRaidLastFrame && isRaidThisFrame)
+            {
+                Plugin.Instance.StartRaid();
+            }
+            _isRaidLastFrame = isRaidThisFrame;
         }
     }
 }

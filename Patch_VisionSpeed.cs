@@ -15,6 +15,10 @@ namespace ombarella
         public static void PatchPostfix(ref float __result, EnemyInfo __instance)
         {
             {
+                if (!Plugin.MasterSwitch.Value)
+                {
+                    return;
+                }
                 if (__instance != null)
                 {
                     __result *= Plugin.Instance.FinalLightMeter;

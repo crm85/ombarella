@@ -73,7 +73,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CameraController.cs" />
-    <Compile Include="LightCamera.cs" />
     <Compile Include="Patch_VisionSpeed.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="PluginManager.cs" />
