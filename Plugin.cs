@@ -3,12 +3,13 @@ using BepInEx.Configuration;
 using EFT;
 using SPT.Reflection.Patching;
 using System;
+using System.Collections;
+using Unity;
 using UnityEngine;
 using UnityEngine.Rendering;
-using Unity;
-using Random = UnityEngine.Random;
+using static EFT.ScenesPreset;
 using Object = UnityEngine.Object;
-using System.Collections;
+using Random = UnityEngine.Random;
 
 namespace ombarella
 {
@@ -36,11 +37,13 @@ namespace ombarella
         }
 
         // config values
-        public static ConfigEntry<float> DetectionMultiplier;
+        public static ConfigEntry<float> MeterAttenuationCoef;
         public static ConfigEntry<float> SamplesPerSecond;
         public static ConfigEntry<float> SampleRandomizer;
         public static ConfigEntry<float> PixelsPerFrame;
         public static ConfigEntry<bool> MeterViz;
+        public static ConfigEntry<float> IndicatorPosX;
+        public static ConfigEntry<float> IndicatorPosY;
 
         // debug values
         public static ConfigEntry<float> CamDistanceOffset;
@@ -60,12 +63,10 @@ namespace ombarella
         static int _rigCount = 1;
 
         PluginManager Manager { get; set; }
-        Visualiser Visualiser { get; set; }
 
         void Initialize()
         {
             Manager = new PluginManager();
-            Visualiser = new Visualiser();
 
             Utils.Logger = this.Logger;
 
@@ -91,24 +92,25 @@ namespace ombarella
         void LoadConfig()
         {
             SamplesPerSecond = ConstructFloatConfig(1.5f, "a - Settings", "Samples per second", "How many times per second the light meter is sampled; affects performance a lot", 1f, 20f);
-            DetectionMultiplier = ConstructFloatConfig(1.0f, "a - Settings", "Light meter strength", "Modify how much bots are affected by the light meter (lower = you become harder to detect in low light)", 0.1f, 1f);
+            MeterAttenuationCoef = ConstructFloatConfig(0.3f, "a - Settings", "Light meter strength", "Modify how much bots are affected by the light meter (lower = you are harder to detect in low light)", 0f, 1f);
             SampleRandomizer = ConstructFloatConfig(0.15f, "a - Settings", "Sample Randomizer", "Percentage change that pixel analysis will be skipped on a given pass; essentially a performance tool. 0 = zero % chance of sample, 1 = guaranteed sample", 0f, 1f);
             CameraFOV = ConstructFloatConfig(40f, "a - Settings", "CameraFOV", "", 10f, 170f);
-            PixelsPerFrame = ConstructFloatConfig(1f, "a - Settings", "Pixels scanned per frame", "", 1f, 60f);
-            MeterViz = ConstructBoolConfig(false, "a - Settings", "Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are");
-            
+            PixelsPerFrame = ConstructFloatConfig(5f, "a - Settings", "Pixels scanned per frame", "", 1f, 60f);
+            MeterViz = ConstructBoolConfig(true, "a - Settings", "Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are");
+            IndicatorPosX = ConstructFloatConfig(-1100f, "a - Settings", "IndicatorPosX", "", -2000f, 2000f);
+            IndicatorPosY = ConstructFloatConfig(-715f, "a - Settings", "IndicatorPosY", "", -2000f, 2000f);
+
             IsDebug = ConstructBoolConfig(false, "y - Debug", "1) Enable debug logging", "");
             DebugUpdateFreq = ConstructFloatConfig(1f, "y - Debug", "2) Debug updates per second", "How frequently the debug logger updates per second", 1f, 10f);
 
             //
             // for eventual deletion
             //
-            CamDistanceOffset = ConstructFloatConfig(0, "z - Debug", "CamDistanceOffset", "", -1f, 1f);
-            CamVerticalOffset = ConstructFloatConfig(0, "z - Debug", "CamVerticalOffset", "", -1f, 1f);
-            AddZCam = ConstructFloatConfig(0, "z - Debug", "AddZCam", "", -1f, 1f);
-            AddYPlayer = ConstructFloatConfig(0, "z - Debug", "AddYPlayer", "", 0, 10f);
-            MeterMulti = ConstructFloatConfig(10f, "z - Debug", "meterMulti", "", 1f, 20f);
-            LerpSpeed = ConstructFloatConfig(1f, "z - Debug", "LerpSpeed", "", 1f, 20f);
+            CamDistanceOffset = ConstructFloatConfig(1f, "z - Debug", "CamDistanceOffset", "", -1f, 1f);
+            CamVerticalOffset = ConstructFloatConfig(0.25f, "z - Debug", "CamVerticalOffset", "", -1f, 1f);
+            AddYPlayer = ConstructFloatConfig(2f, "z - Debug", "AddYPlayer", "", 0, 10f);
+            MeterMulti = ConstructFloatConfig(12f, "z - Debug", "meterMulti", "", 1f, 20f);
+            LerpSpeed = ConstructFloatConfig(8f, "z - Debug", "LerpSpeed", "", 1f, 20f);
 
         }
 
@@ -219,7 +221,7 @@ namespace ombarella
             _lightMeterPool = Mathf.Clamp(_lightMeterPool, 0.01f, 10f);
             _lightMeterPool += value;
             _avgLightMeter = _lightMeterPool * processTime;
-            Utils.Log($"_lightMeterPool : {_lightMeterPool} || newMeasurement {value} || _avgLightMeter : {_avgLightMeter}", true);
+            //Utils.Log($"_lightMeterPool : {_lightMeterPool} || newMeasurement {value} || _avgLightMeter : {_avgLightMeter}", true);
             ClampFinalValue();
         }
 
@@ -265,18 +267,21 @@ namespace ombarella
             _lightMeterPool = Mathf.Clamp(_lightMeterPool, 0.01f, 10f);
             _lightMeterPool += newMeasurement;
             _avgLightMeter = _lightMeterPool / ratio;
-            Utils.Log($"_lightMeterPool : {_lightMeterPool} || newMeasurement {newMeasurement} || _avgLightMeter : {_avgLightMeter}", true);
+            //Utils.Log($"_lightMeterPool : {_lightMeterPool} || newMeasurement {newMeasurement} || _avgLightMeter : {_avgLightMeter}", true);
         }
 
         float _finalValueLerped = 0.01f;
+        float _finalValueBeforeMod = 0f;
 
         void ClampFinalValue()
         {
-            float finalValue = _avgLightMeter * DetectionMultiplier.Value;
+            //float finalValue = _avgLightMeter * MeterAttenuationCoef.Value;
+            float finalValue = Mathf.Lerp(_avgLightMeter, 1f, MeterAttenuationCoef.Value);
             finalValue *= Mathf.Clamp(_avgLightMeter, 0.1f, 1f);
             _finalValueLerped = Mathf.Lerp(_finalValueLerped, finalValue, Time.deltaTime * LerpSpeed.Value);
-            FinalLightMeter = finalValue;
-            //Utils.Log($"final light output : {FinalLightMeter}", true);
+            _finalValueBeforeMod = _finalValueLerped;
+            FinalLightMeter = Mathf.Lerp(_finalValueLerped, 1f, MeterAttenuationCoef.Value);
+            Utils.Log($"_finalValueBeforeMod : {_finalValueBeforeMod} // final light output : {FinalLightMeter}", true);
         }
 
         void RepositionCamera()
@@ -410,6 +415,23 @@ namespace ombarella
             Utils.Log($"lumen {averageLuminance}", true);
 
             return averageLuminance;
+        }
+
+        GUIStyle efficiencyIndicatorStyle = new GUIStyle();
+
+        void OnGUI()
+        {
+            if (!MeterViz.Value)
+            { return; }
+            if (Utils.IsInRaid())
+            {
+                efficiencyIndicatorStyle.normal.textColor = Color.grey;
+                efficiencyIndicatorStyle.fontSize = 30;
+                float indicatorHorizontalPos = (float)Screen.width / 2f + IndicatorPosX.Value;
+                float indicatorVerticalPos = (float)Screen.height / 2f + IndicatorPosY.Value;
+                string input = Visualiser.GetLevelString(_finalValueBeforeMod);
+                GUI.Label(new Rect(indicatorHorizontalPos, indicatorVerticalPos, 40f, 40f), input, efficiencyIndicatorStyle);
+            }
         }
     }
 }

@@ -7,36 +7,64 @@ using UnityEngine;
 
 namespace ombarella
 {
-    public class Visualiser : MonoBehaviour
+    public static class Visualiser
     {
-        readonly string VIS_ZERO =      ">         <";
-        readonly string VIS_ONE =       ">-        <";
-        readonly string VIS_TWO =       ">--       <";
-        readonly string VIS_THREE =     ">---      <";
-        readonly string VIS_FOUR =      ">----     <";
-        readonly string VIS_FIVE =      ">-----    <";
-        readonly string VIS_SIX =       ">------   <";
-        readonly string VIS_SEVEN =     ">-------  <";
-        readonly string VIS_EIGHT =     ">-------- <";
-        readonly string VIS_NINE =      ">---------<";
+        static readonly string VIS_ZERO =      ".           .";
+        static readonly string VIS_ONE =       ". -         .";
+        static readonly string VIS_TWO =       ". --        .";
+        static readonly string VIS_THREE =     ". ---       .";
+        static readonly string VIS_FOUR =      ". ----      .";
+        static readonly string VIS_FIVE =      ". -----     .";
+        static readonly string VIS_SIX =       ". ------    .";
+        static readonly string VIS_SEVEN =     ". -------   .";
+        static readonly string VIS_EIGHT =     ". --------  .";
+        static readonly string VIS_NINE =      ". --------- .";
 
-        //void OnGUI()
-        //{
-        //    float level = 1f;
-        //    string display = GetLevelString(level);
-        //}
 
-        //string GetLevelString(float averageLight)
-        //{
-        //    string toDisplay;
-        //    if (averageLight < 0.1f)
-        //    {
-        //        toDisplay = VIS_ZERO;
-        //    }
-        //    else if (averageLight < 0.2f)
-        //    {
-        //        toDisplay = VIS_ONE;
-        //    }
-        //}
+        public static string GetLevelString(float averageLight)
+        {
+            string toDisplay;
+            if (averageLight < 0.1f)
+            {
+                toDisplay = VIS_ZERO;
+            }
+            else if (averageLight < 0.2f)
+            {
+                toDisplay = VIS_ONE;
+            }
+            else if (averageLight < 0.3f)
+            {
+                toDisplay = VIS_TWO;
+            }
+            else if (averageLight < 0.4f)
+            {
+                toDisplay = VIS_THREE;
+            }
+            else if (averageLight < 0.5f)
+            {
+                toDisplay = VIS_FOUR;
+            }
+            else if (averageLight < 0.6f)
+            {
+                toDisplay = VIS_FIVE;
+            }
+            else if (averageLight < 0.7f)
+            {
+                toDisplay = VIS_SIX;
+            }
+            else if (averageLight < 0.8f)
+            {
+                toDisplay = VIS_SEVEN;
+            }
+            else if (averageLight < 0.9f)
+            {
+                toDisplay = VIS_EIGHT;
+            }
+            else
+            {
+                toDisplay = VIS_NINE;
+            }
+            return toDisplay;
+        }
     }
 }

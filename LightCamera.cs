@@ -103,7 +103,7 @@ namespace ombarella
 
         void ClampFinalValue()
         {
-            float finalValue = _lightMeterAverage * Plugin.DetectionMultiplier.Value;
+            float finalValue = _lightMeterAverage * Plugin.MeterAttenuationCoef.Value;
             finalValue *= Mathf.Clamp(_lightMeterAverage, 0.1f, 1f);
             _lightMeterClamped = finalValue;
             //Utils.Log($"final light output : {FinalLightMeter}", true);
