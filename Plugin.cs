@@ -46,16 +46,20 @@ namespace ombarella
         public static ConfigEntry<bool> MeterViz;
         public static ConfigEntry<bool> MasterSwitch;
 
-        // config values
+        // settings
         public static ConfigEntry<float> MeterAttenuationCoef;
         public static ConfigEntry<float> PixelsPerFrame;
+
+        // adv settings
         public static ConfigEntry<float> IndicatorPosX;
         public static ConfigEntry<float> IndicatorPosY;
-
-        // debug values
         public static ConfigEntry<float> MeterMulti;
         public static ConfigEntry<float> CameraFOV;
+        public static ConfigEntry<float> redMulti;
+        public static ConfigEntry<float> greenMulti;
+        public static ConfigEntry<float> blueMulti;
 
+        // debug values
         public static ConfigEntry<float> DebugUpdateFreq;
         public static ConfigEntry<bool> IsDebug;
 
@@ -84,24 +88,26 @@ namespace ombarella
 
         void LoadConfig()
         {
+            // toggles
             MasterSwitch = ConstructBoolConfig(true, "a - Toggles", "Master Switch", "Toggle all mod functions on/off");
             MeterViz = ConstructBoolConfig(true, "a - Toggles", "Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are");
 
+            // main settings
             MeterAttenuationCoef = ConstructFloatConfig(0.3f, "b - Main Settings", "Light meter strength", "Modify how much bots are affected by the light meter (lower = you are harder to detect in low light)", 0f, 1f);
             PixelsPerFrame = ConstructFloatConfig(5f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
 
+            // adv settings
             CameraFOV = ConstructFloatConfig(40f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
             IndicatorPosX = ConstructFloatConfig(-1100f, "c - Advanced Settings", "IndicatorPosX", "", -2000f, 2000f);
             IndicatorPosY = ConstructFloatConfig(-715f, "c - Advanced Settings", "IndicatorPosY", "", -2000f, 2000f);
             MeterMulti = ConstructFloatConfig(12f, "c - Advanced Settings", "Light Meter Multiplier", "Multiplies the base light meter reading into a normalized number", 1f, 20f);
+            redMulti = ConstructFloatConfig(0.2126f, "c - Advanced Settings", "Red multiplier", "During pixel analysis red is multiplied by this factor to discern lumenescence", 0, 1f);
+            greenMulti = ConstructFloatConfig(0.7152f, "c - Advanced Settings", "Green multiplier", "During pixel analysis green is multiplied by this factor to discern lumenescence", 0, 1f);
+            blueMulti = ConstructFloatConfig(0.0722f, "c - Advanced Settings", "Blue multiplier", "During pixel analysis blue is multiplied by this factor to discern lumenescence", 0, 1f);
 
+            // debug
             IsDebug = ConstructBoolConfig(false, "y - Debug", "1) Enable debug logging", "");
             DebugUpdateFreq = ConstructFloatConfig(1f, "y - Debug", "2) Debug updates per second", "How frequently the debug logger updates per second", 1f, 10f);
-
-            //
-            // for eventual deletion
-            //
-
         }
 
         void Update()
@@ -177,10 +183,47 @@ namespace ombarella
 
             int pixelsThisFrame = 0;
             int i = 0;
+
+            float highR = 0;
+            float lowR = 1f;
+            float highG = 0;
+            float lowG = 1f;
+            float highB = 0;
+            float lowB = 1f;
+
             while (i < allColors.Length)
             {
                 Color color = allColors[i];
-                totalLuminance += (color.r * 0.2126f) + (color.g * 0.7152f) + (color.b * 0.0722f);
+
+                totalLuminance += (color.r * redMulti.Value) + (color.g * greenMulti.Value) + (color.b * blueMulti.Value);
+
+                if (color.r > highR)
+                {
+                    highR = color.r;
+                }
+                if (color.r < lowR)
+                {
+                    lowR = color.r;
+                }
+
+                if (color.g > highG)
+                {
+                    highG = color.g;
+                }
+                if (color.g < lowG)
+                {
+                    lowG = color.g;
+                }
+
+                if (color.b > highB)
+                {
+                    highB = color.b;
+                }
+                if (color.b < lowB)
+                {
+                    lowB = color.b;
+                }
+
                 pixelsThisFrame++;
 
                 if (pixelsThisFrame == PixelsPerFrame.Value)
@@ -195,24 +238,36 @@ namespace ombarella
             }
 
             float averageLuminance = totalLuminance / allColors.Length;
-
+            float averageColorBreadth = GetColorBreadth(highR, lowR, highG, lowG, highB, lowB);
 
             RenderTexture.active = oldRenderTexture;
             Object.Destroy(texture2D);
 
             Utils.Log($"lumen {averageLuminance}", false);
 
-            RecalcMeterAverage(averageLuminance, processTime);
+            RecalcMeterAverage(averageLuminance, averageColorBreadth, processTime);
             routineRunning = false;
         }
 
-        void RecalcMeterAverage(float value, float processTime)
+        float GetColorBreadth(float highR, float lowR, float highG, float lowG, float highB, float lowB)
         {
-            value = Mathf.Clamp(value, 0.01f, 0.1f);
-            value *= MeterMulti.Value;
+            float rSize = highR - lowR;
+            float gSize = highG - lowG;
+            float bSize = highB - lowB;
+            float totalSize = (rSize + gSize + bSize) / 3f;
+            Utils.Log($"color breadth total size : {totalSize}", false);
+            return totalSize;
+        }
+
+        void RecalcMeterAverage(float lumen, float colorBreadth, float processTime)
+        {
+            lumen = Mathf.Clamp(lumen, 0.01f, 0.1f);
+            lumen *= MeterMulti.Value;
+            float flagrancy = (lumen + colorBreadth) / 2f;
             _lightMeterPool -= _avgLightMeter;
             _lightMeterPool = Mathf.Clamp(_lightMeterPool, 0.01f, 10f);
-            _lightMeterPool += value;
+            //_lightMeterPool += lumen;
+            _lightMeterPool += flagrancy;
             _avgLightMeter = _lightMeterPool * processTime;
             ClampFinalValue();
         }
@@ -228,7 +283,6 @@ namespace ombarella
             ConfigEntry<bool> result = ((BaseUnityPlugin)this).Config.Bind<bool>(category, descriptionShort, defaultValue, new ConfigDescription(descriptionFull, (AcceptableValueBase)null, Array.Empty<object>()));
             return result;
         }
-
         private void SetupCamera()
         {
             _lightCam = new Camera();
@@ -242,7 +296,6 @@ namespace ombarella
             CameraController.Initialize(_lightCam);
             _lightCam.enabled = false;
         }
-
 
         float _lightMeterPool = 0f;
         float _avgLightMeter = 0.01f;
