@@ -9,6 +9,7 @@ C:\repos\ombarella\bin\Debug\spt-core.dll
 C:\repos\ombarella\bin\Debug\spt-reflection.dll
 C:\repos\ombarella\bin\Debug\UnityEngine.CoreModule.dll
 C:\repos\ombarella\bin\Debug\UnityEngine.dll
+C:\repos\ombarella\bin\Debug\UnityEngine.IMGUIModule.dll
 C:\repos\ombarella\bin\Debug\Mono.Cecil.dll
 C:\repos\ombarella\bin\Debug\MonoMod.Utils.dll
 C:\repos\ombarella\bin\Debug\MonoMod.RuntimeDetour.dll
@@ -27,7 +28,6 @@ C:\repos\ombarella\bin\Debug\bsg.microsoft.extensions.objectpool.dll
 C:\repos\ombarella\bin\Debug\UnityEngine.UnityWebRequestModule.dll
 C:\repos\ombarella\bin\Debug\websocket-sharp.dll
 C:\repos\ombarella\bin\Debug\UnityEngine.TerrainModule.dll
-C:\repos\ombarella\bin\Debug\UnityEngine.IMGUIModule.dll
 C:\repos\ombarella\bin\Debug\UnityEngine.AudioModule.dll
 C:\repos\ombarella\bin\Debug\UnityEngine.ParticleSystemModule.dll
 C:\repos\ombarella\bin\Debug\UnityEngine.VehiclesModule.dll

@@ -18,8 +18,8 @@ namespace ombarella
             Quaternion cameraAngleYAxis = Quaternion.AngleAxis(randomAngle, Vector3.up);
             Vector3 posOffsetFromPlayer = playerPosAdjusted;
             posOffsetFromPlayer.x += Plugin.Instance.CamDistanceOffset;
-            Vector3 direction = posOffsetFromPlayer - playerPosAdjusted;
-            Vector3 rotDirection = cameraAngleYAxis * direction;
+            Vector3 cameraOffsetFromPlayer = posOffsetFromPlayer - playerPosAdjusted;
+            Vector3 rotDirection = cameraAngleYAxis * cameraOffsetFromPlayer;
             Vector3 newCamPos = playerPosAdjusted + rotDirection;
             newCamPos.y += Plugin.Instance.CamVerticalOffset;
             Vector3 vectorCameraToPlayer = playerPosAdjusted - newCamPos;
