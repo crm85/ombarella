@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using SPT.Reflection.Patching;
 using System.Reflection;
+using UnityEngine;
 
 namespace ombarella
 {
@@ -21,7 +22,12 @@ namespace ombarella
                 }
                 if (__instance != null)
                 {
-                    __result *= Plugin.Instance.FinalLightMeter;
+                    float newValue = Plugin.Instance.FinalLightMeter;
+                    if (__instance.HaveNightVision())
+                    {
+                        newValue = Mathf.Lerp(newValue, 1f, 0.7f);
+                    }
+                    __result *= newValue;
                 }
             }
         }

@@ -20,7 +20,7 @@ namespace ombarella
 
         const string modGUID = "Ombarella";
         const string modName = "Ombarella";
-        const string modVersion = "0.2";
+        const string modVersion = "0.3";
 
         Player _player;
         Camera _lightCam;
@@ -55,9 +55,9 @@ namespace ombarella
         public static ConfigEntry<float> IndicatorPosY;
         public static ConfigEntry<float> MeterMulti;
         public static ConfigEntry<float> CameraFOV;
-        public static ConfigEntry<float> redMulti;
-        public static ConfigEntry<float> greenMulti;
-        public static ConfigEntry<float> blueMulti;
+        public static ConfigEntry<float> redMultiLumen;
+        public static ConfigEntry<float> greenMultiLumen;
+        public static ConfigEntry<float> blueMultiLumen;
 
         // debug values
         public static ConfigEntry<float> DebugUpdateFreq;
@@ -97,8 +97,7 @@ namespace ombarella
 
             // main settings
             MeterAttenuationCoef = ConstructFloatConfig(0.3f, "b - Main Settings", "Light meter strength", "Modify how much bots are affected by the light meter (lower = you are harder to detect in low light)", 0f, 1f);
-            PixelsPerFrame = ConstructFloatConfig(5f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
-            PixelsPerFrame = ConstructFloatConfig(5f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
+            PixelsPerFrame = ConstructFloatConfig(3f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
 
             // adv settings
             CameraFOV = ConstructFloatConfig(40f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
@@ -108,9 +107,9 @@ namespace ombarella
             CenterTextureScanCoef = ConstructFloatConfig(0.35f, "c - Advanced Settings", "Luminance Scan Size", "How much of the texture to scan for luminance (to focus on the player's body)", 0.1f, 1f);
             
             // color values
-            redMulti = ConstructFloatConfig(0.35f, "d - Color Sensitivity", "Red multiplier", "During pixel analysis red is multiplied by this to discern lumenance", 0, 1f);
-            greenMulti = ConstructFloatConfig(0.86f, "d - Color Sensitivity", "Green multiplier", "During pixel analysis green is multiplied by this to discern lumenance", 0, 1f);
-            blueMulti = ConstructFloatConfig(0.2f, "d - Color Sensitivity", "Blue multiplier", "During pixel analysis blue is multiplied by this to discern lumenance", 0, 1f);
+            redMultiLumen = ConstructFloatConfig(0.35f, "d - Color Sensitivity", "Red multiplier", "During pixel analysis red is multiplied by this to discern lumenance", 0, 1f);
+            greenMultiLumen = ConstructFloatConfig(0.86f, "d - Color Sensitivity", "Green multiplier", "During pixel analysis green is multiplied by this to discern lumenance", 0, 1f);
+            blueMultiLumen = ConstructFloatConfig(0.2f, "d - Color Sensitivity", "Blue multiplier", "During pixel analysis blue is multiplied by this to discern lumenance", 0, 1f);
 
             // debug
             IsDebug = ConstructBoolConfig(false, "y - Debug", "1) Enable debug logging", "");
@@ -263,7 +262,7 @@ namespace ombarella
 
                     if (flag1 && flag2 && flag3 && flag4)
                     {
-                        totalLuminance += (color.r * redMulti.Value) + (color.g * greenMulti.Value) + (color.b * blueMulti.Value);
+                        totalLuminance += (color.r * redMultiLumen.Value) + (color.g * greenMultiLumen.Value) + (color.b * blueMultiLumen.Value);
                         luminanceLength ++;
                         Utils.Log($"pixel {a}/{j} scanned", true);
                     }
@@ -297,14 +296,17 @@ namespace ombarella
 
                     pixelsThisFrame++;
 
-                    if (pixelsThisFrame == PixelsPerFrame.Value)
+                    if (pixelsThisFrame >= Mathf.RoundToInt(PixelsPerFrame.Value))
                     {
                         pixelsThisFrame = 0;
                         yield return new WaitForEndOfFrame();
                         processTime += Time.deltaTime;
                     }
+                    else
+                    {
+                        processTime += Time.deltaTime;
+                    }
 
-                    processTime += Time.deltaTime;
                     //i++;
                 }
 
@@ -327,6 +329,11 @@ namespace ombarella
             float rSize = highR - lowR;
             float gSize = highG - lowG;
             float bSize = highB - lowB;
+
+            rSize *= 0.8f;
+            gSize *= 0.3f;
+            bSize *= 1.0f;
+
             float totalSize = (rSize + gSize + bSize) / 3f;
             Utils.Log($"color breadth total size : {totalSize}", false);
             return totalSize;
@@ -395,8 +402,10 @@ namespace ombarella
 
         void OnGUI()
         {
-            if (!MeterViz.Value)
-            { return; }
+            if (!MeterViz.Value || !MasterSwitch.Value)
+            { 
+                return; 
+            }
             if (Utils.IsInRaid())
             {
                 efficiencyIndicatorStyle.normal.textColor = Color.grey;
