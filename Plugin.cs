@@ -97,8 +97,7 @@ namespace ombarella
 
             // main settings
             MeterAttenuationCoef = ConstructFloatConfig(0.3f, "b - Main Settings", "Light meter strength", "Modify how much bots are affected by the light meter (lower = you are harder to detect in low light)", 0f, 1f);
-            PixelsPerFrame = ConstructFloatConfig(5f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
-            PixelsPerFrame = ConstructFloatConfig(5f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
+            PixelsPerFrame = ConstructFloatConfig(3f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
 
             // adv settings
             CameraFOV = ConstructFloatConfig(40f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
@@ -403,8 +402,10 @@ namespace ombarella
 
         void OnGUI()
         {
-            if (!MeterViz.Value)
-            { return; }
+            if (!MeterViz.Value || !MasterSwitch.Value)
+            { 
+                return; 
+            }
             if (Utils.IsInRaid())
             {
                 efficiencyIndicatorStyle.normal.textColor = Color.grey;
