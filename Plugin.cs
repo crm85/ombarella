@@ -97,14 +97,14 @@ namespace ombarella
 
             // main settings
             MeterAttenuationCoef = ConstructFloatConfig(0.3f, "b - Main Settings", "Light meter strength", "Modify how much bots are affected by the light meter (lower = you are harder to detect in low light)", 0f, 1f);
-            PixelsPerFrame = ConstructFloatConfig(1f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
+            PixelsPerFrame = ConstructFloatConfig(1f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 10f);
 
             // adv settings
             CameraFOV = ConstructFloatConfig(50f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
             IndicatorPosX = ConstructFloatConfig(-1000f, "c - Advanced Settings", "IndicatorPosX", "", -2000f, 2000f);
             IndicatorPosY = ConstructFloatConfig(-715f, "c - Advanced Settings", "IndicatorPosY", "", -2000f, 2000f);
             MeterMulti = ConstructFloatConfig(12f, "c - Advanced Settings", "Light Meter Multiplier", "Multiplies the base light meter reading into a normalized number", 1f, 20f);
-            CenterTextureScanCoef = ConstructFloatConfig(1f, "c - Advanced Settings", "Luminance Scan Size", "How much of the texture to scan for luminance (to focus on the player's body)", 0.1f, 1f);
+            //CenterTextureScanCoef = ConstructFloatConfig(1f, "c - Advanced Settings", "Luminance Scan Size", "How much of the texture to scan for luminance (to focus on the player's body)", 0.1f, 1f);
             
             // color values
             redMultiLumen = ConstructFloatConfig(0.35f, "d - Color Sensitivity", "Red multiplier", "During pixel analysis red is multiplied by this to discern lumenance", 0, 1f);
@@ -178,15 +178,13 @@ namespace ombarella
 
             _lightCam.Render();
 
-            //var oldRenderTexture = RenderTexture.active;
             RenderTexture.active = rt;
 
-            //var texture2D = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false);
             tex.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0, false);
             tex.Apply(false);
 
-            //Color[] allColors = texture2D.GetPixels();
-            //int i = 0;
+            Color[] allColors = tex.GetPixels();
+            int i = 0;
 
             float totalLuminance = 0f;
 
@@ -199,122 +197,54 @@ namespace ombarella
             float highB = 0;
             float lowB = 1f;
 
-            //while (i < allColors.Length)
-            //{
-            //    Color color = allColors[i];
-
-            //    totalLuminance += (color.r * redMulti.Value) + (color.g * greenMulti.Value) + (color.b * blueMulti.Value);
-
-            //    if (color.r > highR)
-            //    {
-            //        highR = color.r;
-            //    }
-            //    if (color.r < lowR)
-            //    {
-            //        lowR = color.r;
-            //    }
-
-            //    if (color.g > highG)
-            //    {
-            //        highG = color.g;
-            //    }
-            //    if (color.g < lowG)
-            //    {
-            //        lowG = color.g;
-            //    }
-
-            //    if (color.b > highB)
-            //    {
-            //        highB = color.b;
-            //    }
-            //    if (color.b < lowB)
-            //    {
-            //        lowB = color.b;
-            //    }
-
-            //    pixelsThisFrame++;
-
-            //    if (pixelsThisFrame == PixelsPerFrame.Value)
-            //    {
-            //        pixelsThisFrame = 0;
-            //        yield return new WaitForEndOfFrame();
-            //        processTime += Time.deltaTime;
-            //    }
-
-            //    processTime += Time.deltaTime;
-            //    i++;
-            //}
-
-            float centralCoef = CenterTextureScanCoef.Value;
-            int luminanceLength = 0;
-
-            for (int a = 0; a < tex.width; a++)
+            while (i < allColors.Length)
             {
-                for (int j = 0; j < tex.height; j++)
+                Color color = allColors[i];
+
+                totalLuminance += (color.r * redMultiLumen.Value) + (color.g * greenMultiLumen.Value) + (color.b * blueMultiLumen.Value);
+
+                if (color.r > highR)
                 {
-                    Color color = tex.GetPixel(a, j);
-
-                    bool flag1 = a > (((float)tex.width / 2f) - ((float)tex.width / 2) * centralCoef);
-                    bool flag2 = a < (((float)tex.width / 2f) + ((float)tex.width / 2) * centralCoef);
-                    bool flag3 = j > (((float)tex.height / 2f) - ((float)tex.height / 2f) * centralCoef);
-                    bool flag4 = j < (((float)tex.height / 2f) + ((float)tex.height / 2f) * centralCoef);
-
-                    if (flag1 && flag2 && flag3 && flag4)
-                    {
-                        totalLuminance += (color.r * redMultiLumen.Value) + (color.g * greenMultiLumen.Value) + (color.b * blueMultiLumen.Value);
-                        luminanceLength ++;
-                        Utils.Log($"pixel {a}/{j} scanned", true);
-                    }
-
-                    if (color.r > highR)
-                    {
-                        highR = color.r;
-                    }
-                    if (color.r < lowR)
-                    {
-                        lowR = color.r;
-                    }
-
-                    if (color.g > highG)
-                    {
-                        highG = color.g;
-                    }
-                    if (color.g < lowG)
-                    {
-                        lowG = color.g;
-                    }
-
-                    if (color.b > highB)
-                    {
-                        highB = color.b;
-                    }
-                    if (color.b < lowB)
-                    {
-                        lowB = color.b;
-                    }
-
-                    pixelsThisFrame++;
-
-                    if (pixelsThisFrame >= Mathf.RoundToInt(PixelsPerFrame.Value))
-                    {
-                        pixelsThisFrame = 0;
-                        yield return new WaitForEndOfFrame();
-                        processTime += Time.deltaTime;
-                    }
-                    else
-                    {
-                        processTime += Time.deltaTime;
-                    }
-
-                    //i++;
+                    highR = color.r;
                 }
+                if (color.r < lowR)
+                {
+                    lowR = color.r;
+                }
+
+                if (color.g > highG)
+                {
+                    highG = color.g;
+                }
+                if (color.g < lowG)
+                {
+                    lowG = color.g;
+                }
+
+                if (color.b > highB)
+                {
+                    highB = color.b;
+                }
+                if (color.b < lowB)
+                {
+                    lowB = color.b;
+                }
+
+                pixelsThisFrame++;
+
+                if (pixelsThisFrame == PixelsPerFrame.Value)
+                {
+                    pixelsThisFrame = 0;
+                    yield return new WaitForEndOfFrame();
+                    processTime += Time.deltaTime;
+                }
+
+                processTime += Time.deltaTime;
+                i++;
             }
 
-            float averageLuminance = totalLuminance / luminanceLength;
+            float averageLuminance = totalLuminance / allColors.Length;
             float averageColorBreadth = GetColorBreadth(highR, lowR, highG, lowG, highB, lowB);
-
-            //RenderTexture.active = oldRenderTexture;
-            //Object.Destroy(texture2D);
 
             Utils.Log($"lumen {averageLuminance}", false);
 
