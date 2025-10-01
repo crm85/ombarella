@@ -20,14 +20,14 @@ namespace ombarella
 
         const string modGUID = "Ombarella";
         const string modName = "Ombarella";
-        const string modVersion = "0.3";
+        const string modVersion = "0.4";
 
         Player _player;
         Camera _lightCam;
         RenderTexture rt;
         Texture2D tex;
         Rect rectReadPicture;
-        readonly int rectSize = 8;
+        readonly int rectSize = 4;
 
         public bool _isRaid { get; set; }
 
@@ -97,14 +97,14 @@ namespace ombarella
 
             // main settings
             MeterAttenuationCoef = ConstructFloatConfig(0.3f, "b - Main Settings", "Light meter strength", "Modify how much bots are affected by the light meter (lower = you are harder to detect in low light)", 0f, 1f);
-            PixelsPerFrame = ConstructFloatConfig(3f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
+            PixelsPerFrame = ConstructFloatConfig(1f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
 
             // adv settings
-            CameraFOV = ConstructFloatConfig(40f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
+            CameraFOV = ConstructFloatConfig(50f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
             IndicatorPosX = ConstructFloatConfig(-1000f, "c - Advanced Settings", "IndicatorPosX", "", -2000f, 2000f);
             IndicatorPosY = ConstructFloatConfig(-715f, "c - Advanced Settings", "IndicatorPosY", "", -2000f, 2000f);
             MeterMulti = ConstructFloatConfig(12f, "c - Advanced Settings", "Light Meter Multiplier", "Multiplies the base light meter reading into a normalized number", 1f, 20f);
-            CenterTextureScanCoef = ConstructFloatConfig(0.35f, "c - Advanced Settings", "Luminance Scan Size", "How much of the texture to scan for luminance (to focus on the player's body)", 0.1f, 1f);
+            CenterTextureScanCoef = ConstructFloatConfig(1f, "c - Advanced Settings", "Luminance Scan Size", "How much of the texture to scan for luminance (to focus on the player's body)", 0.1f, 1f);
             
             // color values
             redMultiLumen = ConstructFloatConfig(0.35f, "d - Color Sensitivity", "Red multiplier", "During pixel analysis red is multiplied by this to discern lumenance", 0, 1f);
@@ -116,7 +116,6 @@ namespace ombarella
             DebugUpdateFreq = ConstructFloatConfig(1f, "y - Debug", "2) Debug updates per second", "How frequently the debug logger updates per second", 1f, 10f);
 
             // dev
-
         }
 
         void Update()
@@ -179,12 +178,12 @@ namespace ombarella
 
             _lightCam.Render();
 
-            var oldRenderTexture = RenderTexture.active;
+            //var oldRenderTexture = RenderTexture.active;
             RenderTexture.active = rt;
 
-            var texture2D = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false);
-            texture2D.ReadPixels(new Rect(0, 0, texture2D.width, texture2D.height), 0, 0, false);
-            texture2D.Apply();
+            //var texture2D = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false);
+            tex.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0, false);
+            tex.Apply(false);
 
             //Color[] allColors = texture2D.GetPixels();
             //int i = 0;
@@ -249,16 +248,16 @@ namespace ombarella
             float centralCoef = CenterTextureScanCoef.Value;
             int luminanceLength = 0;
 
-            for (int a = 0; a < texture2D.width; a++)
+            for (int a = 0; a < tex.width; a++)
             {
-                for (int j = 0; j < texture2D.height; j++)
+                for (int j = 0; j < tex.height; j++)
                 {
-                    Color color = texture2D.GetPixel(a, j);
+                    Color color = tex.GetPixel(a, j);
 
-                    bool flag1 = a > (((float)texture2D.width / 2f) - ((float)texture2D.width / 2) * centralCoef);
-                    bool flag2 = a < (((float)texture2D.width / 2f) + ((float)texture2D.width / 2) * centralCoef);
-                    bool flag3 = j > (((float)texture2D.height / 2f) - ((float)texture2D.height / 2f) * centralCoef);
-                    bool flag4 = j < (((float)texture2D.height / 2f) + ((float)texture2D.height / 2f) * centralCoef);
+                    bool flag1 = a > (((float)tex.width / 2f) - ((float)tex.width / 2) * centralCoef);
+                    bool flag2 = a < (((float)tex.width / 2f) + ((float)tex.width / 2) * centralCoef);
+                    bool flag3 = j > (((float)tex.height / 2f) - ((float)tex.height / 2f) * centralCoef);
+                    bool flag4 = j < (((float)tex.height / 2f) + ((float)tex.height / 2f) * centralCoef);
 
                     if (flag1 && flag2 && flag3 && flag4)
                     {
@@ -309,14 +308,13 @@ namespace ombarella
 
                     //i++;
                 }
-
             }
 
             float averageLuminance = totalLuminance / luminanceLength;
             float averageColorBreadth = GetColorBreadth(highR, lowR, highG, lowG, highB, lowB);
 
-            RenderTexture.active = oldRenderTexture;
-            Object.Destroy(texture2D);
+            //RenderTexture.active = oldRenderTexture;
+            //Object.Destroy(texture2D);
 
             Utils.Log($"lumen {averageLuminance}", false);
 
@@ -371,7 +369,7 @@ namespace ombarella
             rt.dimension = TextureDimension.Tex2D;
             rt.wrapMode = TextureWrapMode.Clamp;
             _lightCam.targetTexture = rt;
-            tex = new Texture2D(rt.width, rt.height);
+            tex = new Texture2D(rt.width, rt.height, TextureFormat.RGBAHalf, false);
             rectReadPicture = new Rect(0, 0, rt.width, rt.height);
             CameraController.Initialize(_lightCam);
             _lightCam.enabled = false;
