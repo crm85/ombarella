@@ -58,6 +58,9 @@ namespace ombarella
         public static ConfigEntry<float> redMultiLumen;
         public static ConfigEntry<float> greenMultiLumen;
         public static ConfigEntry<float> blueMultiLumen;
+        public static ConfigEntry<float> redMultiBreadt;
+        public static ConfigEntry<float> greenMultiBreadt;
+        public static ConfigEntry<float> blueMultiBreadt;
 
         // debug values
         public static ConfigEntry<float> DebugUpdateFreq;
@@ -96,7 +99,7 @@ namespace ombarella
             MeterViz = ConstructBoolConfig(true, "a - Toggles", "Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are");
 
             // main settings
-            MeterAttenuationCoef = ConstructFloatConfig(0.3f, "b - Main Settings", "Light meter strength", "Modify how much bots are affected by the light meter (lower = you are harder to detect in low light)", 0f, 1f);
+            MeterAttenuationCoef = ConstructFloatConfig(0.75f, "b - Main Settings", "Light meter strength", "Modify how much bots are affected by the light meter (100% = bots get full effect [aka nerf])", 0f, 1f);
             PixelsPerFrame = ConstructFloatConfig(1f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 10f);
 
             // adv settings
@@ -107,9 +110,13 @@ namespace ombarella
             //CenterTextureScanCoef = ConstructFloatConfig(1f, "c - Advanced Settings", "Luminance Scan Size", "How much of the texture to scan for luminance (to focus on the player's body)", 0.1f, 1f);
             
             // color values
-            redMultiLumen = ConstructFloatConfig(0.35f, "d - Color Sensitivity", "Red multiplier", "During pixel analysis red is multiplied by this to discern lumenance", 0, 1f);
-            greenMultiLumen = ConstructFloatConfig(0.86f, "d - Color Sensitivity", "Green multiplier", "During pixel analysis green is multiplied by this to discern lumenance", 0, 1f);
-            blueMultiLumen = ConstructFloatConfig(0.2f, "d - Color Sensitivity", "Blue multiplier", "During pixel analysis blue is multiplied by this to discern lumenance", 0, 1f);
+            redMultiLumen = ConstructFloatConfig(0.35f, "d - Color Sensitivity", "Red lumen multiplier", "Red in pixel is multiplied by this value to calculate lumenance", 0, 1f);
+            greenMultiLumen = ConstructFloatConfig(0.86f, "d - Color Sensitivity", "Green lumen multiplier", "Green in pixel is multiplied by this value to calculate lumenance", 0, 1f);
+            blueMultiLumen = ConstructFloatConfig(0.2f, "d - Color Sensitivity", "Blue lumen multiplier", "Blue in pixel is multiplied by this value to calculate lumenance", 0, 1f);
+
+            redMultiBreadt = ConstructFloatConfig(0.75f, "d - Color Sensitivity", "Red breadth multiplier", "Red range in pixel is multiplied by this value to calculate breadth (camo)", 0, 1f);
+            greenMultiBreadt = ConstructFloatConfig(0.3f, "d - Color Sensitivity", "Green breadth multiplier", "Blue range in pixel is multiplied by this value to calculate breadth (camo)", 0, 1f);
+            blueMultiBreadt = ConstructFloatConfig(1f, "d - Color Sensitivity", "Blue breadth multiplier", "Green range in pixel is multiplied by this value to calculate breadth (camo)", 0, 1f);
 
             // debug
             IsDebug = ConstructBoolConfig(false, "y - Debug", "1) Enable debug logging", "");
@@ -258,9 +265,9 @@ namespace ombarella
             float gSize = highG - lowG;
             float bSize = highB - lowB;
 
-            rSize *= 0.8f;
-            gSize *= 0.3f;
-            bSize *= 1.0f;
+            rSize *= redMultiBreadt.Value;
+            gSize *= greenMultiBreadt.Value;
+            bSize *= blueMultiBreadt.Value;
 
             float totalSize = (rSize + gSize + bSize) / 3f;
             Utils.Log($"color breadth total size : {totalSize}", false);
@@ -317,7 +324,8 @@ namespace ombarella
             float finalValue = Mathf.Clamp(_avgLightMeter, 0.01f, 1f);
             _finalValueLerped = Mathf.Lerp(_finalValueLerped, finalValue, Time.deltaTime * LerpSpeed);
 
-            FinalLightMeter = Mathf.Lerp(_finalValueLerped, 1f, MeterAttenuationCoef.Value);
+            float meterCoef = 1f - MeterAttenuationCoef.Value;
+            FinalLightMeter = Mathf.Lerp(_finalValueLerped, 1f, meterCoef);
             Utils.Log($"_finalValueBeforeMod : {_finalValueLerped} // final light output : {FinalLightMeter}", false);
         }
 
