@@ -3,7 +3,7 @@ using Random = UnityEngine.Random;
 
 namespace ombarella
 {
-    public static class CameraController
+    public static class CameraRig
     {
         public static Camera _lightCam;
         public static void Initialize(Camera camera)
@@ -13,15 +13,15 @@ namespace ombarella
         public static void RepositionCamera()
         {
             Vector3 playerPosAdjusted = Utils.GetMainPlayer().Position;
-            playerPosAdjusted.y += Plugin.Instance.AddYPlayer;
+            playerPosAdjusted.y += Plugin.PlayerVerticalOffset.Value;
             float randomAngle = Random.Range(1f, 360f);
             Quaternion cameraAngleYAxis = Quaternion.AngleAxis(randomAngle, Vector3.up);
             Vector3 posOffsetFromPlayer = playerPosAdjusted;
-            posOffsetFromPlayer.x += Plugin.Instance.CamDistanceOffset;
+            posOffsetFromPlayer.x += Plugin.CamHorizontalOffset.Value;
             Vector3 cameraOffsetFromPlayer = posOffsetFromPlayer - playerPosAdjusted;
             Vector3 rotDirection = cameraAngleYAxis * cameraOffsetFromPlayer;
             Vector3 newCamPos = playerPosAdjusted + rotDirection;
-            newCamPos.y += Plugin.Instance.CamVerticalOffset;
+            newCamPos.y += Plugin.CamVerticalOffset.Value;
             Vector3 vectorCameraToPlayer = playerPosAdjusted - newCamPos;
             _lightCam.gameObject.transform.position = newCamPos;
             _lightCam.gameObject.transform.rotation = Quaternion.LookRotation(vectorCameraToPlayer);

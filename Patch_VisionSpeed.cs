@@ -20,15 +20,18 @@ namespace ombarella
                 {
                     return;
                 }
-                if (__instance != null)
+                if (__instance == null)
                 {
-                    float newValue = Plugin.Instance.FinalLightMeter;
-                    if (__instance.HaveNightVision())
-                    {
-                        newValue = Mathf.Lerp(newValue, 1f, 0.7f);
-                    }
-                    __result *= newValue;
+                    return ;
                 }
+
+                // modify vision speed
+                float newValue = Plugin.Instance.FinalLightMeter;
+                if (__instance.HaveNightVision())
+                {
+                    newValue = Mathf.Lerp(newValue, 1f, 0.7f);
+                }
+                __result *= newValue;
             }
         }
     }

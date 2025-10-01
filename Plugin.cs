@@ -24,17 +24,13 @@ namespace ombarella
 
         Player _player;
         Camera _lightCam;
-        RenderTexture rt;
-        Texture2D tex;
-        Rect rectReadPicture;
+        RenderTexture _rt;
+        Texture2D _tex;
+        Rect _rectReadPicture;
         readonly int rectSize = 4;
 
-        public bool _isRaid { get; set; }
+        public bool IsRaid { get; set; }
 
-        public float CamDistanceOffset = 1f;
-        public float CamVerticalOffset = 0.25f;
-        public float AddYPlayer = 2f;
-        public float LerpSpeed = 8f;
 
         void Awake()
         {
@@ -49,6 +45,7 @@ namespace ombarella
         // settings
         public static ConfigEntry<float> MeterAttenuationCoef;
         public static ConfigEntry<float> PixelsPerFrame;
+        public static ConfigEntry<float> AimNerf;
 
         // adv settings
         public static ConfigEntry<float> IndicatorPosX;
@@ -62,21 +59,30 @@ namespace ombarella
         public static ConfigEntry<float> greenMultiBreadt;
         public static ConfigEntry<float> blueMultiBreadt;
 
+        // camera rig settings
+        public static ConfigEntry<float> CamHorizontalOffset;
+        public static ConfigEntry<float> CamVerticalOffset;
+        public static ConfigEntry<float> PlayerVerticalOffset;
+        public static ConfigEntry<float> LerpSpeed;
+
         // debug values
         public static ConfigEntry<float> DebugUpdateFreq;
         public static ConfigEntry<bool> IsDebug;
 
         // dev
-        public static ConfigEntry<float> CenterTextureScanCoef;
 
         void Initialize()
         {
             Utils.Logger = this.Logger;
-
+            LoadPatches();
             LoadConfig();
             SetupCamera();
+        }
 
+        void LoadPatches()
+        {
             TryLoadPatch(new Patch_VisionSpeed());
+            TryLoadPatch(new Patch_AimOffset());
         }
 
         void TryLoadPatch(ModulePatch patch)
@@ -99,24 +105,30 @@ namespace ombarella
             MeterViz = ConstructBoolConfig(true, "a - Toggles", "Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are");
 
             // main settings
-            MeterAttenuationCoef = ConstructFloatConfig(0.75f, "b - Main Settings", "Light meter strength", "Modify how much bots are affected by the light meter (100% = bots get full effect [aka nerf])", 0f, 1f);
-            PixelsPerFrame = ConstructFloatConfig(1f, "b - Main Settings", "Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 10f);
+            PixelsPerFrame = ConstructFloatConfig(1f, "b - Main Settings", "1-Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 10f);
+            MeterAttenuationCoef = ConstructFloatConfig(0.75f, "b - Main Settings", "2-Light meter strength", "Determines how quickly bots can spot you per your visiblity level (100% = bots get full effect, slower recognition time)", 0f, 1f);
+            AimNerf = ConstructFloatConfig(0.3f, "b - Main Settings", "3-Bot aim handicap", "Determines how much bots' aim is affected by your visibility level (100% = full nerf, bots' aim heavily affected by viz level", 0f, 1f);
 
             // adv settings
             CameraFOV = ConstructFloatConfig(50f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
             IndicatorPosX = ConstructFloatConfig(-1000f, "c - Advanced Settings", "IndicatorPosX", "", -2000f, 2000f);
             IndicatorPosY = ConstructFloatConfig(-715f, "c - Advanced Settings", "IndicatorPosY", "", -2000f, 2000f);
             MeterMulti = ConstructFloatConfig(12f, "c - Advanced Settings", "Light Meter Multiplier", "Multiplies the base light meter reading into a normalized number", 1f, 20f);
-            //CenterTextureScanCoef = ConstructFloatConfig(1f, "c - Advanced Settings", "Luminance Scan Size", "How much of the texture to scan for luminance (to focus on the player's body)", 0.1f, 1f);
-            
-            // color values
-            redMultiLumen = ConstructFloatConfig(0.35f, "d - Color Sensitivity", "Red lumen multiplier", "Red in pixel is multiplied by this value to calculate lumenance", 0, 1f);
-            greenMultiLumen = ConstructFloatConfig(0.86f, "d - Color Sensitivity", "Green lumen multiplier", "Green in pixel is multiplied by this value to calculate lumenance", 0, 1f);
-            blueMultiLumen = ConstructFloatConfig(0.2f, "d - Color Sensitivity", "Blue lumen multiplier", "Blue in pixel is multiplied by this value to calculate lumenance", 0, 1f);
+            LerpSpeed = ConstructFloatConfig(8f, "c - Advanced Settings", "Meter lerp speed", "How fast the light meter updates its output", 1f, 20f);
 
-            redMultiBreadt = ConstructFloatConfig(0.75f, "d - Color Sensitivity", "Red breadth multiplier", "Red range in pixel is multiplied by this value to calculate breadth (camo)", 0, 1f);
-            greenMultiBreadt = ConstructFloatConfig(0.3f, "d - Color Sensitivity", "Green breadth multiplier", "Blue range in pixel is multiplied by this value to calculate breadth (camo)", 0, 1f);
-            blueMultiBreadt = ConstructFloatConfig(1f, "d - Color Sensitivity", "Blue breadth multiplier", "Green range in pixel is multiplied by this value to calculate breadth (camo)", 0, 1f);
+            // color values
+            redMultiLumen = ConstructFloatConfig(0.35f, "d - Color Sensitivity", "1-Red lumen multiplier", "Red in pixel is multiplied by this value to calculate lumenance", 0, 1f);
+            greenMultiLumen = ConstructFloatConfig(0.86f, "d - Color Sensitivity", "2-Green lumen multiplier", "Green in pixel is multiplied by this value to calculate lumenance", 0, 1f);
+            blueMultiLumen = ConstructFloatConfig(0.2f, "d - Color Sensitivity", "3-Blue lumen multiplier", "Blue in pixel is multiplied by this value to calculate lumenance", 0, 1f);
+
+            redMultiBreadt = ConstructFloatConfig(0.75f, "d - Color Sensitivity", "4-Red breadth multiplier", "Red range in pixel is multiplied by this value to calculate breadth (camo)", 0, 1f);
+            greenMultiBreadt = ConstructFloatConfig(0.3f, "d - Color Sensitivity", "5-Green breadth multiplier", "Blue range in pixel is multiplied by this value to calculate breadth (camo)", 0, 1f);
+            blueMultiBreadt = ConstructFloatConfig(1f, "d - Color Sensitivity", "6-Blue breadth multiplier", "Green range in pixel is multiplied by this value to calculate breadth (camo)", 0, 1f);
+
+            // camera rig
+            CamHorizontalOffset = ConstructFloatConfig(1f, "e - Camera Rig Settings", "Camera horizontal offset", "Distance between the camera and the player focus point on horizontal plane", 0.1f, 3f);
+            CamVerticalOffset = ConstructFloatConfig(0.25f, "e - Camera Rig Settings", "Camera vertical offset", "Distance between the camera and the player focus point on vertical plane", 0.1f, 3f);
+            PlayerVerticalOffset = ConstructFloatConfig(2f, "e - Camera Rig Settings", "Player vertical offset", "Vertical distance between the player's root position (feet) and the camera focus point", 0.1f, 3f);
 
             // debug
             IsDebug = ConstructBoolConfig(false, "y - Debug", "1) Enable debug logging", "");
@@ -134,7 +146,7 @@ namespace ombarella
             PluginManager.Update();
             Utils.Update(Time.deltaTime);
 
-            if (!_isRaid)
+            if (!IsRaid)
             {
                 return;
             }
@@ -151,19 +163,19 @@ namespace ombarella
             // good to update meter
             //
             UpdateLightMeter();
-            CameraController.UpdateDebugLines();
+            CameraRig.UpdateDebugLines();
         }
 
         public void CleanupRaid()
         {
             _player = null;
-            _isRaid = false;
+            IsRaid = false;
         }
 
         public void StartRaid()
         {
             _player = Utils.GetMainPlayer();
-            _isRaid = true;
+            IsRaid = true;
         }
 
         void UpdateLightMeter()
@@ -185,12 +197,12 @@ namespace ombarella
 
             _lightCam.Render();
 
-            RenderTexture.active = rt;
+            RenderTexture.active = _rt;
 
-            tex.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0, false);
-            tex.Apply(false);
+            _tex.ReadPixels(new Rect(0, 0, _tex.width, _tex.height), 0, 0, false);
+            _tex.Apply(false);
 
-            Color[] allColors = tex.GetPixels();
+            Color[] allColors = _tex.GetPixels();
             int i = 0;
 
             float totalLuminance = 0f;
@@ -239,14 +251,16 @@ namespace ombarella
 
                 pixelsThisFrame++;
 
-                if (pixelsThisFrame == PixelsPerFrame.Value)
+                if (pixelsThisFrame >= Mathf.RoundToInt(PixelsPerFrame.Value))
                 {
                     pixelsThisFrame = 0;
                     yield return new WaitForEndOfFrame();
                     processTime += Time.deltaTime;
                 }
-
-                processTime += Time.deltaTime;
+                else
+                {
+                    processTime += Time.deltaTime;
+                }
                 i++;
             }
 
@@ -279,10 +293,11 @@ namespace ombarella
             lumen = Mathf.Clamp(lumen, 0.01f, 0.1f);
             lumen *= MeterMulti.Value;
             float flagrancy = (lumen + colorBreadth) / 2f;
+
             _lightMeterPool -= _avgLightMeter;
-            _lightMeterPool = Mathf.Clamp(_lightMeterPool, 0.01f, 10f);
-            //_lightMeterPool += lumen;
             _lightMeterPool += flagrancy;
+            _lightMeterPool = Mathf.Clamp(_lightMeterPool, 0.01f, 10f);
+
             _avgLightMeter = _lightMeterPool * processTime;
             ClampFinalValue();
         }
@@ -302,13 +317,13 @@ namespace ombarella
         {
             _lightCam = new Camera();
             _lightCam = gameObject.AddComponent<Camera>();
-            rt = new RenderTexture(rectSize, rectSize, 1);
-            rt.dimension = TextureDimension.Tex2D;
-            rt.wrapMode = TextureWrapMode.Clamp;
-            _lightCam.targetTexture = rt;
-            tex = new Texture2D(rt.width, rt.height, TextureFormat.RGBAHalf, false);
-            rectReadPicture = new Rect(0, 0, rt.width, rt.height);
-            CameraController.Initialize(_lightCam);
+            _rt = new RenderTexture(rectSize, rectSize, 1);
+            _rt.dimension = TextureDimension.Tex2D;
+            _rt.wrapMode = TextureWrapMode.Clamp;
+            _lightCam.targetTexture = _rt;
+            _tex = new Texture2D(_rt.width, _rt.height, TextureFormat.RGBAHalf, false);
+            _rectReadPicture = new Rect(0, 0, _rt.width, _rt.height);
+            CameraRig.Initialize(_lightCam);
             _lightCam.enabled = false;
         }
 
@@ -322,7 +337,7 @@ namespace ombarella
         void ClampFinalValue()
         {
             float finalValue = Mathf.Clamp(_avgLightMeter, 0.01f, 1f);
-            _finalValueLerped = Mathf.Lerp(_finalValueLerped, finalValue, Time.deltaTime * LerpSpeed);
+            _finalValueLerped = Mathf.Lerp(_finalValueLerped, finalValue, Time.deltaTime * LerpSpeed.Value);
 
             float meterCoef = 1f - MeterAttenuationCoef.Value;
             FinalLightMeter = Mathf.Lerp(_finalValueLerped, 1f, meterCoef);
@@ -331,7 +346,7 @@ namespace ombarella
 
         void RepositionCamera()
         {
-            CameraController.RepositionCamera();
+            CameraRig.RepositionCamera();
         }
 
         GUIStyle efficiencyIndicatorStyle = new GUIStyle();
