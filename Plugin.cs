@@ -4,6 +4,7 @@ using EFT;
 using SPT.Reflection.Patching;
 using System;
 using System.Collections;
+using System.IO;
 using Unity;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -27,7 +28,7 @@ namespace ombarella
         RenderTexture _rt;
         Texture2D _tex;
         Rect _rectReadPicture;
-        readonly int rectSize = 4;
+        readonly int _texSize = 16;
 
         public bool IsRaid { get; set; }
 
@@ -70,13 +71,18 @@ namespace ombarella
         public static ConfigEntry<bool> IsDebug;
 
         // dev
+        public static ConfigEntry<float> CullingMask;
+        public static ConfigEntry<float> OutputMulti;
 
         void Initialize()
         {
             Utils.Logger = this.Logger;
             LoadPatches();
             LoadConfig();
-            SetupCamera();
+            //SetupCamera();
+            PopulateShader();
+            SetupRenderTexture();
+            MapRenderTexToShader();
         }
 
         void LoadPatches()
@@ -105,7 +111,7 @@ namespace ombarella
             MeterViz = ConstructBoolConfig(true, "a - Toggles", "Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are");
 
             // main settings
-            PixelsPerFrame = ConstructFloatConfig(1f, "b - Main Settings", "1-Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 10f);
+            PixelsPerFrame = ConstructFloatConfig(1f, "b - Main Settings", "1-Pixels scanned per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
             MeterAttenuationCoef = ConstructFloatConfig(0.75f, "b - Main Settings", "2-Light meter strength", "Determines how quickly bots can spot you per your visiblity level (100% = bots get full effect, slower recognition time)", 0f, 1f);
             AimNerf = ConstructFloatConfig(0.3f, "b - Main Settings", "3-Bot aim handicap", "Determines how much bots' aim is affected by your visibility level (100% = full nerf, bots' aim heavily affected by viz level", 0f, 1f);
 
@@ -135,7 +141,11 @@ namespace ombarella
             DebugUpdateFreq = ConstructFloatConfig(1f, "y - Debug", "2) Debug updates per second", "How frequently the debug logger updates per second", 1f, 10f);
 
             // dev
+            CullingMask = ConstructFloatConfig(1f, "z - Dev", "CullingMask", "", 0f, 100f);
+            OutputMulti = ConstructFloatConfig(1f, "z - Dev", "OutputMulti", "", 0f, 100f);
         }
+
+        float updateTimer = 0f;
 
         void Update()
         {
@@ -162,8 +172,13 @@ namespace ombarella
             //
             // good to update meter
             //
-            UpdateLightMeter();
-            CameraRig.UpdateDebugLines();
+            updateTimer += Time.deltaTime;
+            if (updateTimer > 1f / PixelsPerFrame.Value)
+            {
+                updateTimer = 0;
+                UpdateLightMeter();
+            }
+            //CameraRig.UpdateDebugLines();
         }
 
         public void CleanupRaid()
@@ -178,14 +193,21 @@ namespace ombarella
             IsRaid = true;
         }
 
+        float debugScore = 0f;
         void UpdateLightMeter()
         {
+            _lightCam.depth = CullingMask.Value;
             _lightCam.fieldOfView = CameraFOV.Value;
             RepositionCamera();
-            if (!routineRunning)
-            {
-                StartCoroutine(LightMeterRoutine());
-            }
+            //if (!routineRunning)
+            //{
+            //    StartCoroutine(LightMeterRoutine());
+            //}
+            float score = DispatchShader();
+            score /= 64f;
+            score *= OutputMulti.Value;
+            Utils.Log($"final light score is {score}", true);
+            debugScore = score;
         }
 
         bool routineRunning = false;
@@ -320,7 +342,7 @@ namespace ombarella
         {
             _lightCam = new Camera();
             _lightCam = gameObject.AddComponent<Camera>();
-            _rt = new RenderTexture(rectSize, rectSize, 1);
+            _rt = new RenderTexture(_texSize, _texSize, 1);
             _rt.dimension = TextureDimension.Tex2D;
             _rt.wrapMode = TextureWrapMode.Clamp;
             _lightCam.targetTexture = _rt;
@@ -328,6 +350,71 @@ namespace ombarella
             _rectReadPicture = new Rect(0, 0, _rt.width, _rt.height);
             CameraRig.Initialize(_lightCam);
             _lightCam.enabled = false;
+        }
+
+        ComputeShader shader;
+
+        void PopulateShader()
+        {
+            var bundle = AssetBundle.LoadFromFile(Path.Combine(BepInEx.Paths.PluginPath, "Ombarella", "ombhistogram"));
+            shader = bundle.LoadAsset<ComputeShader>("GetAllPixelColors");
+            string isNull = shader == null ? "is NULL" : "is loaded!";
+            Debug.Log($"shader {isNull}");
+        }
+
+        void SetupRenderTexture()
+        {
+            _rt = new RenderTexture(_texSize, _texSize, 4, RenderTextureFormat.RGB565);
+            _rt.enableRandomWrite = true;
+            _rt.Create();
+
+            _lightCam = new Camera();
+            _lightCam = gameObject.AddComponent<Camera>();
+            _lightCam.targetTexture = _rt;
+            _lightCam.renderingPath = RenderingPath.DeferredShading;
+            CameraRig.Initialize(_lightCam);
+
+            _tex = new Texture2D(_rt.width, _rt.height, TextureFormat.RGB565, false);
+            _tex.Apply();
+        }
+
+        float DispatchShader()
+        {
+            Graphics.CopyTexture(_rt, _tex);
+            //https://youtu.be/4Wh8GRrz7WA?t=705
+            //shader.Dispatch(_kernelID, _texSize / 8, _texSize / 8, 1);
+            shader.Dispatch(_handleInitialize, _texSize, 1, 1);
+            shader.Dispatch(_handleMain, (_tex.width + 7) / 8, (_tex.height + 7) / 8, 1);
+            _histogramBuffer.GetData(_histogramData);
+
+            float finalScore = 0;
+            for (int i = 0; i < _histogramData.Length; i++)
+            {
+                //Debug.Log(_histogramData[i]);
+                finalScore += _histogramData[i];
+            }
+            finalScore /= _histogramData.Length;
+            Debug.Log($"final score : {finalScore}");
+            //return 1f - (finalScore / 64f);
+            return finalScore;
+        }
+
+        int _handleInitialize;
+        int _handleMain;
+        ComputeBuffer _histogramBuffer;
+        public uint[] _histogramData;
+
+        void MapRenderTexToShader()
+        {
+            _handleInitialize = shader.FindKernel("HistogramInitialize");
+            _handleMain = shader.FindKernel("HistogramMain");
+            _histogramBuffer = new ComputeBuffer(_texSize, sizeof(uint) * 4);
+            _histogramData = new uint[_texSize * 4];
+
+
+            shader.SetTexture(_handleMain, "InputTexture", _tex);
+            shader.SetBuffer(_handleMain, "HistogramBuffer", _histogramBuffer);
+            shader.SetBuffer(_handleInitialize, "HistogramBuffer", _histogramBuffer);
         }
 
         float _lightMeterPool = 0f;
@@ -363,10 +450,11 @@ namespace ombarella
             if (Utils.IsInRaid())
             {
                 efficiencyIndicatorStyle.normal.textColor = Color.grey;
-                efficiencyIndicatorStyle.fontSize = 30;
+                efficiencyIndicatorStyle.fontSize = 15;
                 float indicatorHorizontalPos = 20f;
                 float indicatorVerticalPos = 0;
-                string input = Visualiser.GetLevelString(_finalValueLerped);
+                //string input = Visualiser.GetLevelString(_finalValueLerped, false);
+                string input = Visualiser.GetLevelString(debugScore, true);
                 GUI.Label(new Rect(indicatorHorizontalPos, indicatorVerticalPos, 40f, 40f), input, efficiencyIndicatorStyle);
             }
         }

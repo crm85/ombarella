@@ -14,8 +14,13 @@
         static readonly string VIS_NINE =      "} ]]]]]]]]] {";
 
 
-        public static string GetLevelString(float averageLight)
+        public static string GetLevelString(float averageLight, bool isDebug)
         {
+            if (isDebug)
+            {
+                string debugString = string.Format($"debug value = {averageLight}");
+                return debugString;
+            }
             string toDisplay;
             if (averageLight < 0.1f)
             {
