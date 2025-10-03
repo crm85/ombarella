@@ -202,7 +202,10 @@ namespace ombarella
             _tex.ReadPixels(new Rect(0, 0, _tex.width, _tex.height), 0, 0, false);
             _tex.Apply(false);
 
-            Color[] allColors = _tex.GetPixels();
+            //Color[] allColors = _tex.GetPixels();
+
+            var allColors = _tex.GetPixelData<Color32>(0);
+
             int i = 0;
 
             float totalLuminance = 0f;
@@ -361,8 +364,8 @@ namespace ombarella
             {
                 efficiencyIndicatorStyle.normal.textColor = Color.grey;
                 efficiencyIndicatorStyle.fontSize = 30;
-                float indicatorHorizontalPos = (float)Screen.width / 2f + IndicatorPosX.Value;
-                float indicatorVerticalPos = (float)Screen.height / 2f + IndicatorPosY.Value;
+                float indicatorHorizontalPos = 20f;
+                float indicatorVerticalPos = 0;
                 string input = Visualiser.GetLevelString(_finalValueLerped);
                 GUI.Label(new Rect(indicatorHorizontalPos, indicatorVerticalPos, 40f, 40f), input, efficiencyIndicatorStyle);
             }

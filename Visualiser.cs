@@ -2,16 +2,16 @@
 {
     public static class Visualiser
     {
-        static readonly string VIS_ZERO =      ".           .";
-        static readonly string VIS_ONE =       ". -         .";
-        static readonly string VIS_TWO =       ". --        .";
-        static readonly string VIS_THREE =     ". ---       .";
-        static readonly string VIS_FOUR =      ". ----      .";
-        static readonly string VIS_FIVE =      ". -----     .";
-        static readonly string VIS_SIX =       ". ------    .";
-        static readonly string VIS_SEVEN =     ". -------   .";
-        static readonly string VIS_EIGHT =     ". --------  .";
-        static readonly string VIS_NINE =      ". --------- .";
+        static readonly string VIS_ZERO =      "}           {";
+        static readonly string VIS_ONE =       "} ]         {";
+        static readonly string VIS_TWO =       "} ]]        {";
+        static readonly string VIS_THREE =     "} ]]]       {";
+        static readonly string VIS_FOUR =      "} ]]]]      {";
+        static readonly string VIS_FIVE =      "} ]]]]]     {";
+        static readonly string VIS_SIX =       "} ]]]]]]    {";
+        static readonly string VIS_SEVEN =     "} ]]]]]]]   {";
+        static readonly string VIS_EIGHT =     "} ]]]]]]]]  {";
+        static readonly string VIS_NINE =      "} ]]]]]]]]] {";
 
 
         public static string GetLevelString(float averageLight)
