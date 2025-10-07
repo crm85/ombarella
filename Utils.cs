@@ -1,6 +1,7 @@
 ﻿using BepInEx.Logging;
 using Comfort.Common;
 using EFT;
+using System.Collections.Generic;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -21,6 +22,16 @@ namespace ombarella
                 return null;
             }
             return instance.MainPlayer;
+        }
+
+        public static List<Player> GetAllPlayers()
+        {
+            GameWorld instance = Singleton<GameWorld>.Instance;
+            if ((Object)(object)instance == (Object)null)
+            {
+                return null;
+            }
+            return instance.AllAlivePlayersList;
         }
 
         public static void Log(string log, bool oneTimeLog)

@@ -22,6 +22,10 @@
                 return debugString;
             }
             string toDisplay;
+            if (float.IsNaN(averageLight))
+            {
+                toDisplay = VIS_ZERO;
+            }
             if (averageLight < 0.1f)
             {
                 toDisplay = VIS_ZERO;

@@ -3,6 +3,7 @@ using BepInEx.Configuration;
 using EFT;
 using SPT.Reflection.Patching;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -23,7 +24,7 @@ namespace ombarella
         RenderTexture _rt;
         Texture2D _tex;
         Rect _rectReadPicture;
-        readonly int _texSize = 16;
+        readonly int _texSize = 32;
 
         public bool IsRaid { get; set; }
 
@@ -44,8 +45,8 @@ namespace ombarella
         public static ConfigEntry<float> AimNerf;
 
         // adv settings
-        public static ConfigEntry<float> MeterMulti;
         public static ConfigEntry<float> CameraFOV;
+        public static ConfigEntry<float> LumaCoef;
 
         // camera rig settings
         public static ConfigEntry<float> CamHorizontalOffset;
@@ -98,12 +99,13 @@ namespace ombarella
             MeterViz = ConstructBoolConfig(true, "a - Toggles", "Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are");
 
             // main settings
-            SamplesPerFrame = ConstructFloatConfig(5f, "b - Main Settings", "1-Updates per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
+            SamplesPerFrame = ConstructFloatConfig(2f, "b - Main Settings", "1-Updates per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
             MeterAttenuationCoef = ConstructFloatConfig(0.5f, "b - Main Settings", "2-Light meter strength", "Determines how quickly bots can spot you per your visiblity level (100% = bots get full effect, slower recognition time)", 0f, 1f);
             AimNerf = ConstructFloatConfig(0.03f, "b - Main Settings", "3-Bot aim handicap", "Determines how much bots' aim is affected by your visibility level (higher = bots' aim more nerfed by your viz level; zero = effect is removed", 0f, 0.1f);
 
             // adv settings
-            CameraFOV = ConstructFloatConfig(100f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
+            CameraFOV = ConstructFloatConfig(70f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
+            LumaCoef = ConstructFloatConfig(2f, "c - Advanced Settings", "Luma main multiplier", "Multiplies the raw luma reading into a normalized number", 1f, 20f);
 
             // camera rig
             CamHorizontalOffset = ConstructFloatConfig(0.7f, "e - Camera Rig Settings", "Camera horizontal offset", "Distance between the camera and the player focus point on horizontal plane", 0.1f, 3f);
@@ -143,6 +145,7 @@ namespace ombarella
                 Utils.LogError("Unable to return player, meter updates aborted");
                 return;
             }
+
             //
             // good to update meter
             //
@@ -168,17 +171,22 @@ namespace ombarella
         }
 
         float debugScore = 0f;
+        float debugScore2 = 0f;
         void UpdateLightMeter()
         {
             _lightCam.fieldOfView = CameraFOV.Value;
-            RepositionCamera();
+            List<Player> playersList = Utils.GetAllPlayers();
+            if (playersList.Count == 0)
+            {
+                return;
+            }
+            CameraRig.RepositionCamera(playersList);
             //if (!routineRunning)
             //{
             //    StartCoroutine(LightMeterRoutine());
             //}
             float score = DispatchShader();
-            score /= 16f;
-            score = 1f - score;
+            score *= LumaCoef.Value;
             //score *= OutputMulti.Value;
             debugScore = score;
             RecalcMeterAverage(score);
@@ -192,7 +200,7 @@ namespace ombarella
             _lightMeterPool += lumen;
             _lightMeterPool = Mathf.Clamp(_lightMeterPool, 0.01f, 10f);
 
-            _avgLightMeter = _lightMeterPool * Time.deltaTime * 100f;
+            _avgLightMeter = _lightMeterPool * Time.deltaTime * 50f;
             ClampFinalValue();
         }
 
@@ -211,63 +219,76 @@ namespace ombarella
         {
             _lightCam = new Camera();
             _lightCam = gameObject.AddComponent<Camera>();
-            _rt = new RenderTexture(_texSize, _texSize, 1);
+            _rt = new RenderTexture(_texSize, _texSize, 1, RenderTextureFormat.RGB565);
             _rt.dimension = TextureDimension.Tex2D;
             _rt.wrapMode = TextureWrapMode.Clamp;
             _lightCam.targetTexture = _rt;
-            _tex = new Texture2D(_rt.width, _rt.height, TextureFormat.RGBAHalf, false);
             _rectReadPicture = new Rect(0, 0, _rt.width, _rt.height);
             CameraRig.Initialize(_lightCam);
             _lightCam.enabled = false;
         }
 
-        ComputeShader shader;
+        ComputeShader _computeShader;
 
         void PopulateShader()
         {
-            var bundle = AssetBundle.LoadFromFile(Path.Combine(BepInEx.Paths.PluginPath, "Ombarella", "ombhistogram"));
-            shader = bundle.LoadAsset<ComputeShader>("GetAllPixelColors");
-            string isNull = shader == null ? "is NULL" : "is loaded!";
+            var bundle = AssetBundle.LoadFromFile(Path.Combine(BepInEx.Paths.PluginPath, "Ombarella", "shader"));
+            _computeShader = bundle.LoadAsset<ComputeShader>("GetAllPixelColors");
+            string isNull = _computeShader == null ? "is NULL" : "is loaded!";
             Debug.Log($"shader {isNull}");
         }
+
+        private ComputeBuffer outputBuffer;
 
         void SetupRenderTexture()
         {
             _rt = new RenderTexture(_texSize, _texSize, 4, RenderTextureFormat.RGB565);
             _rt.enableRandomWrite = true;
+            _rt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
+            _rt.depth = 24;
+            _rt.stencilFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.None;
+            _rt.dimension = TextureDimension.Tex2D;
             _rt.Create();
 
             _lightCam = new Camera();
             _lightCam = gameObject.AddComponent<Camera>();
             _lightCam.targetTexture = _rt;
-            _lightCam.renderingPath = RenderingPath.VertexLit;
+            _lightCam.renderingPath = RenderingPath.DeferredShading;
+            //_lightCam.cullingMask = GClass1403.GetAllCollisionsLayerMask(LayerMaskClass.PlayerLayer);
             //_lightCam.nearClipPlane = 0f;
-            _lightCam.farClipPlane = 3f;
+            //_lightCam.farClipPlane = 3f;
             CameraRig.Initialize(_lightCam);
 
-            _tex = new Texture2D(_rt.width, _rt.height, TextureFormat.RGB565, false);
-            _tex.Apply();
+
+            //_rt = new RenderTexture(_texSize, _texSize, 0, RenderTextureFormat.RGB565);
+            //_rt.enableRandomWrite = true;
+            //_rt.Create();
+
+            //// Assign RenderTexture to the camera
+            //_lightCam.targetTexture = _rt;
+
+            // Prepare output buffer
+            outputColors = new Color[_texSize * _texSize];
+            outputBuffer = new ComputeBuffer(outputColors.Length, sizeof(float) * 4);
+
+            // Set kernel handle for compute shader
+            _handleMain = _computeShader.FindKernel("CSMain");
+
+            _computeShader.SetTexture(_handleMain, "textureInput", _rt);
+            _computeShader.SetBuffer(_handleMain, "outputBuffer", outputBuffer);
         }
+
+        Color[] outputColors;
 
         float DispatchShader()
         {
-            Graphics.CopyTexture(_rt, _tex);
-            //https://youtu.be/4Wh8GRrz7WA?t=705
-            //shader.Dispatch(_kernelID, _texSize / 8, _texSize / 8, 1);
-            shader.Dispatch(_handleInitialize, _texSize, 1, 1);
-            shader.Dispatch(_handleMain, (_tex.width + 7) / 8, (_tex.height + 7) / 8, 1);
-            _histogramBuffer.GetData(_histogramData);
+            _computeShader.Dispatch(_handleMain, _texSize / 8, _texSize / 8, 1);
+            outputBuffer.GetData(outputColors);
 
-            float finalScore = 0;
-            for (int i = 0; i < _histogramData.Length; i++)
-            {
-                //Debug.Log(_histogramData[i]);
-                finalScore += _histogramData[i];
-            }
-            finalScore /= _histogramData.Length;
-            Debug.Log($"final score : {finalScore}");
-            //return 1f - (finalScore / 64f);
-            return finalScore;
+            float luma = GetLuma(outputColors);
+            float breadth = GetBreadth(outputColors);
+            float result = (luma + breadth) / 2f;
+            return result;
         }
 
         int _handleInitialize;
@@ -277,15 +298,14 @@ namespace ombarella
 
         void MapRenderTexToShader()
         {
-            _handleInitialize = shader.FindKernel("HistogramInitialize");
-            _handleMain = shader.FindKernel("HistogramMain");
-            _histogramBuffer = new ComputeBuffer(_texSize, sizeof(uint) * 4);
-            _histogramData = new uint[_texSize * 4];
+            //_handleMain = _computeShader.FindKernel("CSMain");
+            //_histogramBuffer = new ComputeBuffer(_texSize, sizeof(uint) * 4);
+            //_histogramData = new uint[_texSize * 4];
 
 
-            shader.SetTexture(_handleMain, "InputTexture", _tex);
-            shader.SetBuffer(_handleMain, "HistogramBuffer", _histogramBuffer);
-            shader.SetBuffer(_handleInitialize, "HistogramBuffer", _histogramBuffer);
+            //_computeShader.SetTexture(_handleMain, "InputTexture", _tex);
+            //_computeShader.SetBuffer(_handleMain, "HistogramBuffer", _histogramBuffer);
+            //_computeShader.SetBuffer(_handleInitialize, "HistogramBuffer", _histogramBuffer);
         }
 
         float _lightMeterPool = 0f;
@@ -305,11 +325,6 @@ namespace ombarella
             Utils.Log($"_finalValueBeforeMod : {_finalValueLerped} // final light output : {FinalLightMeter}", false);
         }
 
-        void RepositionCamera()
-        {
-            CameraRig.RepositionCamera();
-        }
-
         GUIStyle efficiencyIndicatorStyle = new GUIStyle();
 
         void OnGUI()
@@ -321,13 +336,78 @@ namespace ombarella
             if (Utils.IsInRaid())
             {
                 efficiencyIndicatorStyle.normal.textColor = Color.grey;
-                efficiencyIndicatorStyle.fontSize = 25;
+                efficiencyIndicatorStyle.fontSize = 20;
                 float indicatorHorizontalPos = 20f;
                 float indicatorVerticalPos = 10f;
                 string input = Visualiser.GetLevelString(_finalValueLerped, false);
-                //string input = Visualiser.GetLevelString(debugScore, true);
                 GUI.Label(new Rect(indicatorHorizontalPos, indicatorVerticalPos, 40f, 40f), input, efficiencyIndicatorStyle);
+                if (IsDebug.Value)
+                {
+                    string debugString = string.Format($"luma is {debugScore}, breadth is {debugScore2}");
+                    GUI.Label(new Rect(indicatorHorizontalPos, indicatorVerticalPos + 40f, 40f, 40f), debugString, efficiencyIndicatorStyle);
+                }
             }
+        }
+
+
+
+
+        float GetLuma(Color[] pixels)
+        {
+            //0.2126729, 0.7151522, 0.0721750
+
+            float rCoef = 0.2126729f;
+            float gCoef = 0.7151522f;
+            float bCoef = 0.0721750f;
+
+            float r = 0;
+            float g = 0;
+            float b = 0;
+
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                r += pixels[i].r * rCoef;
+                g += pixels[i].g * gCoef;
+                b += pixels[i].b * bCoef;
+            }
+
+            r /= pixels.Length;
+            g /= pixels.Length;
+            b /= pixels.Length;
+
+            float luma = r + g + b;
+            return luma;
+        }
+
+        float GetBreadth(Color[] pixels)
+        {
+            float rLow = 1f;
+            float gLow = 1f;
+            float bLow = 1f;
+
+            float rHigh = 0;
+            float gHigh = 0;
+            float bHigh = 0;
+
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                if (pixels[i].r < rLow) rLow = pixels[i].r;
+                if (pixels[i].g < gLow) gLow = pixels[i].g;
+                if (pixels[i].b < bLow) bLow = pixels[i].b;
+
+                if (pixels[i].r > rHigh) rHigh = pixels[i].r;
+                if (pixels[i].g > gHigh) gHigh = pixels[i].g;
+                if (pixels[i].b > bHigh) bHigh = pixels[i].b;
+            }
+
+            float rRange = rHigh - rLow;
+            float gRange = gHigh - gLow;
+            float bRange = bHigh - bLow;
+
+            float breadth = rRange + gRange + bRange;
+            breadth /= 3f;
+            debugScore2 = breadth;
+            return breadth;
         }
     }
 }
