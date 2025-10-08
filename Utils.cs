@@ -118,5 +118,35 @@ namespace ombarella
             isAlternatePlayerID = setForcedPlayer;
             alternatePlayerID = playerID;
         }
+
+        public static void AssignPlayerToLayer(string layerName)
+        {
+            Player player = GetMainPlayer();
+            GameObject obj = player.gameObject;
+            if (LayerMask.NameToLayer(layerName) != -1)
+            {
+                obj.layer = LayerMask.NameToLayer(layerName);
+            }
+            else
+            {
+                Utils.LogError($"Layer {layerName} does not exist.");
+            }
+        }
+
+        public static List<string> GetExistingLayers()
+        {
+            List<string> layers = new List<string>();
+
+            for (int i = 0; i < 32; i++) // Unity supports layers 0 to 31
+            {
+                string layerName = LayerMask.LayerToName(i);
+                if (!string.IsNullOrEmpty(layerName))
+                {
+                    layers.Add(layerName);
+                }
+            }
+
+            return layers;
+        }
     }
 }

@@ -187,6 +187,7 @@ namespace ombarella
 
         float debugScore = 0f;
         float debugScore2 = 0f;
+        List<string> layerNames;
         void UpdateLightMeter()
         {
             _lightCam.fieldOfView = CameraFOV.Value;
@@ -201,21 +202,21 @@ namespace ombarella
             //    StartCoroutine(LightMeterRoutine());
             //}
             float score = DispatchShader();
-            score *= LumaCoef.Value;
-            //score *= OutputMulti.Value;
             debugScore = score;
             RecalcMeterAverage(score);
-        }
 
+            
+        }
         bool routineRunning = false;
 
-        void RecalcMeterAverage(float lumen)
+        void RecalcMeterAverage(float meterThisFrame)
         {
             _lightMeterPool -= _avgLightMeter;
-            _lightMeterPool += lumen;
+            _lightMeterPool += meterThisFrame;
             _lightMeterPool = Mathf.Clamp(_lightMeterPool, 0.01f, 10f);
 
             _avgLightMeter = _lightMeterPool * Time.deltaTime * 50f;
+            _avgLightMeter = Mathf.Clamp(_avgLightMeter, 0.01f, 1f);
             ClampFinalValue();
         }
 
@@ -269,6 +270,7 @@ namespace ombarella
             _lightCam = gameObject.AddComponent<Camera>();
             _lightCam.targetTexture = _rt;
             _lightCam.renderingPath = RenderingPath.DeferredShading;
+            _lightCam.cullingMask = LayerMask.NameToLayer("PlayerSuperior(Clone)");
             //_lightCam.cullingMask = Utils.GetPlayerCullingMask();
             //_lightCam.nearClipPlane = 0f;
             //_lightCam.farClipPlane = 3f;
@@ -335,6 +337,7 @@ namespace ombarella
             float finalValue = Mathf.Clamp(_avgLightMeter, 0.01f, 1f);
             _finalValueLerped = Mathf.Lerp(_finalValueLerped, finalValue, Time.deltaTime * 20f);
 
+
             float meterCoef = 1f - MeterAttenuationCoef.Value;
             FinalLightMeter = Mathf.Lerp(_finalValueLerped, 1f, meterCoef);
             Utils.Log($"_finalValueBeforeMod : {_finalValueLerped} // final light output : {FinalLightMeter}", false);
@@ -391,7 +394,7 @@ namespace ombarella
             b /= pixels.Length;
 
             float luma = r + g + b;
-            return luma;
+            return luma * LumaCoef.Value;
         }
 
         float GetBreadth(Color[] pixels)
