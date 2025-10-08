@@ -34,6 +34,11 @@ namespace ombarella
             }
         }
 
+        public static int GetPlayerCullingMask()
+        {
+            return LayerMask.NameToLayer("Player");
+        }
+
         public static List<Player> GetAllPlayers()
         {
             GameWorld instance = Singleton<GameWorld>.Instance;

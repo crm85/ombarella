@@ -48,6 +48,16 @@ namespace ombarella
         public static ConfigEntry<float> CameraFOV;
         public static ConfigEntry<float> LumaCoef;
 
+        // color settings
+        public static ConfigEntry<float> RedLumaMulti;
+        public static ConfigEntry<float> GreenLumaMulti;
+        public static ConfigEntry<float> BlueLumaMulti;
+
+        public static ConfigEntry<float> RedBreadthMulti;
+        public static ConfigEntry<float> GreenBreadthMulti;
+        public static ConfigEntry<float> BlueBreadthMulti;
+
+
         // camera rig settings
         public static ConfigEntry<float> CamHorizontalOffset;
         public static ConfigEntry<float> CamVerticalOffset;
@@ -106,6 +116,16 @@ namespace ombarella
             // adv settings
             CameraFOV = ConstructFloatConfig(70f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
             LumaCoef = ConstructFloatConfig(2f, "c - Advanced Settings", "Luma main multiplier", "Multiplies the raw luma reading into a normalized number", 1f, 20f);
+
+            // color multis
+            RedLumaMulti = ConstructFloatConfig(0.21f, "d - Color Settings", "1-Red luma multi", "Red color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+            GreenLumaMulti = ConstructFloatConfig(0.71f, "d - Color Settings", "2-Green luma multi", "Green color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+            BlueLumaMulti = ConstructFloatConfig(0.072f, "d - Color Settings", "3-Blue luma multi", "Blue color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+
+            RedBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "1-Red breadth multi", "Red color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            GreenBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "2-Green breadth multi", "Green color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            BlueBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "3-Blue breadth multi", "Blue color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+
 
             // camera rig
             CamHorizontalOffset = ConstructFloatConfig(0.7f, "e - Camera Rig Settings", "Camera horizontal offset", "Distance between the camera and the player focus point on horizontal plane", 0.1f, 3f);
@@ -254,7 +274,7 @@ namespace ombarella
             _lightCam = gameObject.AddComponent<Camera>();
             _lightCam.targetTexture = _rt;
             _lightCam.renderingPath = RenderingPath.DeferredShading;
-            //_lightCam.cullingMask = GClass1403.GetAllCollisionsLayerMask(LayerMaskClass.PlayerLayer);
+            _lightCam.cullingMask = Utils.GetPlayerCullingMask();
             //_lightCam.nearClipPlane = 0f;
             //_lightCam.farClipPlane = 3f;
             CameraRig.Initialize(_lightCam);
@@ -356,9 +376,9 @@ namespace ombarella
         {
             //0.2126729, 0.7151522, 0.0721750
 
-            float rCoef = 0.2126729f;
-            float gCoef = 0.7151522f;
-            float bCoef = 0.0721750f;
+            float rCoef = RedLumaMulti.Value;
+            float gCoef = BlueLumaMulti.Value;
+            float bCoef = GreenLumaMulti.Value;
 
             float r = 0;
             float g = 0;
@@ -403,6 +423,10 @@ namespace ombarella
             float rRange = rHigh - rLow;
             float gRange = gHigh - gLow;
             float bRange = bHigh - bLow;
+
+            rRange *= RedBreadthMulti.Value;
+            gRange *= GreenBreadthMulti.Value;
+            bRange *= BlueBreadthMulti.Value;
 
             float breadth = rRange + gRange + bRange;
             breadth /= 3f;
