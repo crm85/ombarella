@@ -122,9 +122,9 @@ namespace ombarella
             GreenLumaMulti = ConstructFloatConfig(0.71f, "d - Color Settings", "2-Green luma multi", "Green color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
             BlueLumaMulti = ConstructFloatConfig(0.072f, "d - Color Settings", "3-Blue luma multi", "Blue color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
 
-            RedBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "1-Red breadth multi", "Red color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
-            GreenBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "2-Green breadth multi", "Green color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
-            BlueBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "3-Blue breadth multi", "Blue color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            RedBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "4-Red breadth multi", "Red color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            GreenBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "5-Green breadth multi", "Green color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            BlueBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "6-Blue breadth multi", "Blue color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
 
 
             // camera rig
@@ -274,7 +274,7 @@ namespace ombarella
             _lightCam = gameObject.AddComponent<Camera>();
             _lightCam.targetTexture = _rt;
             _lightCam.renderingPath = RenderingPath.DeferredShading;
-            _lightCam.cullingMask = Utils.GetPlayerCullingMask();
+            //_lightCam.cullingMask = Utils.GetPlayerCullingMask();
             //_lightCam.nearClipPlane = 0f;
             //_lightCam.farClipPlane = 3f;
             CameraRig.Initialize(_lightCam);
