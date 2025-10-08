@@ -60,9 +60,6 @@ namespace ombarella
 
         // camera rig settings
         public static ConfigEntry<float> CamHorizontalOffset;
-        public static ConfigEntry<float> CamVerticalOffset;
-        public static ConfigEntry<float> PlayerVerticalOffset;
-        public static ConfigEntry<float> LerpSpeed;
 
         // debug values
         public static ConfigEntry<float> DebugUpdateFreq;
@@ -114,23 +111,21 @@ namespace ombarella
             AimNerf = ConstructFloatConfig(0.03f, "b - Main Settings", "3-Bot aim handicap", "Determines how much bots' aim is affected by your visibility level (higher = bots' aim more nerfed by your viz level; zero = effect is removed", 0f, 0.1f);
 
             // adv settings
-            CameraFOV = ConstructFloatConfig(70f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
+            CameraFOV = ConstructFloatConfig(30f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
             LumaCoef = ConstructFloatConfig(2f, "c - Advanced Settings", "Luma main multiplier", "Multiplies the raw luma reading into a normalized number", 1f, 20f);
 
             // color multis
-            RedLumaMulti = ConstructFloatConfig(0.21f, "d - Color Settings", "1-Red luma multi", "Red color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
-            GreenLumaMulti = ConstructFloatConfig(0.71f, "d - Color Settings", "2-Green luma multi", "Green color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
-            BlueLumaMulti = ConstructFloatConfig(0.072f, "d - Color Settings", "3-Blue luma multi", "Blue color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+            RedLumaMulti = ConstructFloatConfig(0.8f, "d - Color Settings", "1-Red luma multi", "Red color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+            GreenLumaMulti = ConstructFloatConfig(0.3f, "d - Color Settings", "2-Green luma multi", "Green color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+            BlueLumaMulti = ConstructFloatConfig(0.93f, "d - Color Settings", "3-Blue luma multi", "Blue color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
 
-            RedBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "4-Red breadth multi", "Red color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
-            GreenBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "5-Green breadth multi", "Green color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            RedBreadthMulti = ConstructFloatConfig(0.5f, "d - Color Settings", "4-Red breadth multi", "Red color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            GreenBreadthMulti = ConstructFloatConfig(0.2f, "d - Color Settings", "5-Green breadth multi", "Green color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
             BlueBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "6-Blue breadth multi", "Blue color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
 
 
             // camera rig
-            CamHorizontalOffset = ConstructFloatConfig(0.7f, "e - Camera Rig Settings", "Camera horizontal offset", "Distance between the camera and the player focus point on horizontal plane", 0.1f, 3f);
-            CamVerticalOffset = ConstructFloatConfig(0.1f, "e - Camera Rig Settings", "Camera vertical offset", "Distance between the camera and the player focus point on vertical plane", 0.1f, 3f);
-            PlayerVerticalOffset = ConstructFloatConfig(1f, "e - Camera Rig Settings", "Player vertical offset", "Vertical distance between the player's root position (feet) and the camera focus point", 0.1f, 3f);
+            CamHorizontalOffset = ConstructFloatConfig(2f, "e - Camera Rig Settings", "Camera horizontal offset", "Distance between the camera and the player focus point on horizontal plane", 0.1f, 5f);
 
             // debug
             IsDebug = ConstructBoolConfig(false, "y - Debug", "1) Enable debug logging", "");
