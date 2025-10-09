@@ -111,8 +111,8 @@ namespace ombarella
             AimNerf = ConstructFloatConfig(0.03f, "b - Main Settings", "3-Bot aim handicap", "Determines how much bots' aim is affected by your visibility level (higher = bots' aim more nerfed by your viz level; zero = effect is removed", 0f, 0.1f);
 
             // adv settings
-            CameraFOV = ConstructFloatConfig(30f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
-            LumaCoef = ConstructFloatConfig(2f, "c - Advanced Settings", "Luma main multiplier", "Multiplies the raw luma reading into a normalized number", 1f, 20f);
+            CameraFOV = ConstructFloatConfig(70f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
+            LumaCoef = ConstructFloatConfig(3f, "c - Advanced Settings", "Luma main multiplier", "Multiplies the raw luma reading into a normalized number", 1f, 20f);
 
             // color multis
             RedLumaMulti = ConstructFloatConfig(0.8f, "d - Color Settings", "1-Red luma multi", "Red color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
@@ -125,7 +125,7 @@ namespace ombarella
 
 
             // camera rig
-            CamHorizontalOffset = ConstructFloatConfig(2f, "e - Camera Rig Settings", "Camera horizontal offset", "Distance between the camera and the player focus point on horizontal plane", 0.1f, 5f);
+            CamHorizontalOffset = ConstructFloatConfig(4f, "e - Camera Rig Settings", "Camera horizontal offset", "Distance between the camera and the player focus point on horizontal plane", 0.1f, 5f);
 
             // debug
             IsDebug = ConstructBoolConfig(false, "y - Debug", "1) Enable debug logging", "");
@@ -214,9 +214,11 @@ namespace ombarella
             _lightMeterPool -= _avgLightMeter;
             _lightMeterPool += meterThisFrame;
             _lightMeterPool = Mathf.Clamp(_lightMeterPool, 0.01f, 10f);
+            if (float.IsNaN(_lightMeterPool)) _lightMeterPool = 1f;
 
             _avgLightMeter = _lightMeterPool * Time.deltaTime * 50f;
             _avgLightMeter = Mathf.Clamp(_avgLightMeter, 0.01f, 1f);
+            if (float.IsNaN(_avgLightMeter)) _avgLightMeter = 1f;
             ClampFinalValue();
         }
 
@@ -336,7 +338,7 @@ namespace ombarella
         {
             float finalValue = Mathf.Clamp(_avgLightMeter, 0.01f, 1f);
             _finalValueLerped = Mathf.Lerp(_finalValueLerped, finalValue, Time.deltaTime * 20f);
-
+            if (float.IsNaN(_finalValueLerped)) _finalValueLerped = 1f;
 
             float meterCoef = 1f - MeterAttenuationCoef.Value;
             FinalLightMeter = Mathf.Lerp(_finalValueLerped, 1f, meterCoef);
