@@ -34,6 +34,17 @@ namespace ombarella
             }
         }
 
+        public static bool GetMainCameraCullingIndex(ref int index)
+        {
+            Camera mainCam = Camera.main;
+            if (mainCam != null)
+            {
+                index = mainCam.cullingMask;
+                return true;
+            }
+            return false;
+        }
+
         public static int GetPlayerCullingMask()
         {
             return LayerMask.NameToLayer("Player");

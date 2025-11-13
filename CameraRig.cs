@@ -8,28 +8,48 @@ namespace ombarella
     public static class CameraRig
     {
         public static Camera _lightCam;
-        static int targetIterator = 0;
         public static void Initialize(Camera camera)
         {
             _lightCam = camera;
         }
         public static void RepositionCamera(List<Player> targetList)
         {
-            if (targetList.Count == 1 && targetList[0] == Utils.GetMainPlayer())
+            Player player = Utils.GetMainPlayer();
+
+            if (targetList.Count == 1 && targetList[0] == player)
             {
                 return;
             }
-            if (targetList.Count <= targetIterator)
+
+            float distance = 0;
+            Player closestBot = null;
+            foreach (var bot in targetList)
             {
-                targetIterator = 0;
-            }
-            if (targetList[targetIterator] == Utils.GetMainPlayer())
-            {
-                targetIterator++;
+                if (bot == Utils.GetMainPlayer())
+                {
+                    continue;
+                }
+                else if (distance == 0)
+                {
+                    distance = Vector3.Distance(bot.Position, player.Position);
+                    closestBot = bot;
+                    continue;
+                }
+                else
+                {
+                    float lastDistance = Vector3.Distance(bot.Position, player.Position);
+                    if (lastDistance < distance)
+                    {
+                        distance = lastDistance;
+                        closestBot = bot;
+                    }
+                }
             }
 
-            Vector3 newCamPos = targetList[targetIterator].PlayerBones.Head.position;
-            Vector3 playerPosAdjusted = Utils.GetMainPlayer().PlayerBody.PlayerBones.Ribcage.position;
+            if (closestBot == null) return;
+
+            Vector3 newCamPos = closestBot.PlayerBones.Head.position;
+            Vector3 playerPosAdjusted = player.PlayerBody.PlayerBones.Ribcage.position;
 
             //
             // old random logic
@@ -48,8 +68,6 @@ namespace ombarella
             newCamPos = playerPosAdjusted + -vectorCameraToPlayer;
             _lightCam.gameObject.transform.position = newCamPos;
             _lightCam.gameObject.transform.rotation = Quaternion.LookRotation(vectorCameraToPlayer);
-
-            targetIterator++;
         }
     }
 }

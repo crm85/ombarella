@@ -39,6 +39,10 @@ namespace ombarella
         public static ConfigEntry<bool> MeterViz;
         public static ConfigEntry<bool> MasterSwitch;
 
+        // luma settings
+        
+        // breadth settings
+
         // settings
         public static ConfigEntry<float> MeterAttenuationCoef;
         public static ConfigEntry<float> SamplesPerFrame;
@@ -77,7 +81,6 @@ namespace ombarella
             //SetupCamera();
             PopulateShader();
             SetupRenderTexture();
-            MapRenderTexToShader();
         }
 
         void LoadPatches()
@@ -106,8 +109,8 @@ namespace ombarella
             MeterViz = ConstructBoolConfig(true, "a - Toggles", "Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are");
 
             // main settings
-            SamplesPerFrame = ConstructFloatConfig(2f, "b - Main Settings", "1-Updates per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
-            MeterAttenuationCoef = ConstructFloatConfig(0.5f, "b - Main Settings", "2-Light meter strength", "Determines how quickly bots can spot you per your visiblity level (100% = bots get full effect, slower recognition time)", 0f, 1f);
+            SamplesPerFrame = ConstructFloatConfig(3f, "b - Main Settings", "1-Updates per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
+            MeterAttenuationCoef = ConstructFloatConfig(1f, "b - Main Settings", "2-Light meter strength", "Determines how quickly bots can spot you per your visiblity level (100% = bots get full effect, slower recognition time)", 0f, 1f);
             AimNerf = ConstructFloatConfig(0.03f, "b - Main Settings", "3-Bot aim handicap", "Determines how much bots' aim is affected by your visibility level (higher = bots' aim more nerfed by your viz level; zero = effect is removed", 0f, 0.1f);
 
             // adv settings
@@ -115,12 +118,13 @@ namespace ombarella
             LumaCoef = ConstructFloatConfig(3f, "c - Advanced Settings", "Luma main multiplier", "Multiplies the raw luma reading into a normalized number", 1f, 20f);
 
             // color multis
-            RedLumaMulti = ConstructFloatConfig(0.8f, "d - Color Settings", "1-Red luma multi", "Red color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
-            GreenLumaMulti = ConstructFloatConfig(0.3f, "d - Color Settings", "2-Green luma multi", "Green color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
-            BlueLumaMulti = ConstructFloatConfig(0.93f, "d - Color Settings", "3-Blue luma multi", "Blue color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+            // traditional luma values : r 0.2126729, g 0.7151522, b 0.0721750
+            RedLumaMulti = ConstructFloatConfig(1f, "d - Color Settings", "1-Red luma multi", "Red color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+            GreenLumaMulti = ConstructFloatConfig(1f, "d - Color Settings", "2-Green luma multi", "Green color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+            BlueLumaMulti = ConstructFloatConfig(1f, "d - Color Settings", "3-Blue luma multi", "Blue color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
 
-            RedBreadthMulti = ConstructFloatConfig(0.5f, "d - Color Settings", "4-Red breadth multi", "Red color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
-            GreenBreadthMulti = ConstructFloatConfig(0.2f, "d - Color Settings", "5-Green breadth multi", "Green color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            RedBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "4-Red breadth multi", "Red color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            GreenBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "5-Green breadth multi", "Green color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
             BlueBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "6-Blue breadth multi", "Blue color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
 
 
@@ -272,19 +276,7 @@ namespace ombarella
             _lightCam = gameObject.AddComponent<Camera>();
             _lightCam.targetTexture = _rt;
             _lightCam.renderingPath = RenderingPath.DeferredShading;
-            _lightCam.cullingMask = LayerMask.NameToLayer("PlayerSuperior(Clone)");
-            //_lightCam.cullingMask = Utils.GetPlayerCullingMask();
-            //_lightCam.nearClipPlane = 0f;
-            //_lightCam.farClipPlane = 3f;
             CameraRig.Initialize(_lightCam);
-
-
-            //_rt = new RenderTexture(_texSize, _texSize, 0, RenderTextureFormat.RGB565);
-            //_rt.enableRandomWrite = true;
-            //_rt.Create();
-
-            //// Assign RenderTexture to the camera
-            //_lightCam.targetTexture = _rt;
 
             // Prepare output buffer
             outputColors = new Color[_texSize * _texSize];
@@ -304,9 +296,8 @@ namespace ombarella
             _computeShader.Dispatch(_handleMain, _texSize / 8, _texSize / 8, 1);
             outputBuffer.GetData(outputColors);
 
-            float luma = GetLuma(outputColors);
             float breadth = GetBreadth(outputColors);
-            float result = (luma + breadth) / 2f;
+            float result = breadth;
             return result;
         }
 
@@ -315,17 +306,6 @@ namespace ombarella
         ComputeBuffer _histogramBuffer;
         public uint[] _histogramData;
 
-        void MapRenderTexToShader()
-        {
-            //_handleMain = _computeShader.FindKernel("CSMain");
-            //_histogramBuffer = new ComputeBuffer(_texSize, sizeof(uint) * 4);
-            //_histogramData = new uint[_texSize * 4];
-
-
-            //_computeShader.SetTexture(_handleMain, "InputTexture", _tex);
-            //_computeShader.SetBuffer(_handleMain, "HistogramBuffer", _histogramBuffer);
-            //_computeShader.SetBuffer(_handleInitialize, "HistogramBuffer", _histogramBuffer);
-        }
 
         float _lightMeterPool = 0f;
         float _avgLightMeter = 0.01f;
@@ -337,7 +317,8 @@ namespace ombarella
         void ClampFinalValue()
         {
             float finalValue = Mathf.Clamp(_avgLightMeter, 0.01f, 1f);
-            _finalValueLerped = Mathf.Lerp(_finalValueLerped, finalValue, Time.deltaTime * 20f);
+            //_finalValueLerped = Mathf.Lerp(_finalValueLerped, finalValue, Time.deltaTime * 20f);
+            _finalValueLerped = finalValue;
             if (float.IsNaN(_finalValueLerped)) _finalValueLerped = 1f;
 
             float meterCoef = 1f - MeterAttenuationCoef.Value;
@@ -433,5 +414,30 @@ namespace ombarella
             debugScore2 = breadth;
             return breadth;
         }
+
+        List<Player> _botsToEvaluate = new List<Player>();
+
+        void UpdateBotsToEvaluate()
+        {
+            _botsToEvaluate = Utils.GetAllPlayers();
+            foreach (var bot in _botsToEvaluate)
+            {
+                Player player = Utils.GetMainPlayer();
+                if (bot == player)
+                {
+                    _botsToEvaluate.Remove(bot);
+                    continue;
+                }
+
+                Vector3 raycastVector = player.PlayerBones.Head.position - bot.PlayerBones.Head.position;
+                if (!Physics.Raycast(bot.PlayerBones.Head.position, raycastVector, out RaycastHit hit, 200f))
+                {
+                    _botsToEvaluate.Remove(bot);
+                }
+
+                float hitDist = hit.distance;
+            }
+        }
+
     }
 }
