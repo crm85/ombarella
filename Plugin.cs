@@ -38,14 +38,15 @@ namespace ombarella
         // config toggles
         public static ConfigEntry<bool> MeterViz;
         public static ConfigEntry<bool> MasterSwitch;
+        public static ConfigEntry<bool> UseLuma;
 
         // luma settings
-        
+
         // breadth settings
 
         // settings
         public static ConfigEntry<float> MeterAttenuationCoef;
-        public static ConfigEntry<float> SamplesPerFrame;
+        public static ConfigEntry<float> SamplesPerSec;
         public static ConfigEntry<float> AimNerf;
 
         // adv settings
@@ -107,25 +108,26 @@ namespace ombarella
             // toggles
             MasterSwitch = ConstructBoolConfig(true, "a - Toggles", "Master Switch", "Toggle all mod functions on/off");
             MeterViz = ConstructBoolConfig(true, "a - Toggles", "Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are");
+            UseLuma = ConstructBoolConfig(true, "a - Toggles", "Use Luma meter", "Toggle to incorportate 'luma' analysis, a general measure of your character's brightness");
 
             // main settings
-            SamplesPerFrame = ConstructFloatConfig(3f, "b - Main Settings", "1-Updates per frame", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
+            SamplesPerSec = ConstructFloatConfig(1f, "b - Main Settings", "1-Light samples per second", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
             MeterAttenuationCoef = ConstructFloatConfig(1f, "b - Main Settings", "2-Light meter strength", "Determines how quickly bots can spot you per your visiblity level (100% = bots get full effect, slower recognition time)", 0f, 1f);
             AimNerf = ConstructFloatConfig(0.03f, "b - Main Settings", "3-Bot aim handicap", "Determines how much bots' aim is affected by your visibility level (higher = bots' aim more nerfed by your viz level; zero = effect is removed", 0f, 0.1f);
 
             // adv settings
             CameraFOV = ConstructFloatConfig(70f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
-            LumaCoef = ConstructFloatConfig(3f, "c - Advanced Settings", "Luma main multiplier", "Multiplies the raw luma reading into a normalized number", 1f, 20f);
+            LumaCoef = ConstructFloatConfig(3f, "c - Advanced Settings", "Luma coefficient", "Multiplies the luma result", 1f, 20f);
 
             // color multis
             // traditional luma values : r 0.2126729, g 0.7151522, b 0.0721750
-            RedLumaMulti = ConstructFloatConfig(1f, "d - Color Settings", "1-Red luma multi", "Red color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
-            GreenLumaMulti = ConstructFloatConfig(1f, "d - Color Settings", "2-Green luma multi", "Green color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
-            BlueLumaMulti = ConstructFloatConfig(1f, "d - Color Settings", "3-Blue luma multi", "Blue color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+            RedLumaMulti = ConstructFloatConfig(0.79f, "d - Color Settings", "1-Red luma multi", "Red color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+            GreenLumaMulti = ConstructFloatConfig(0.29f, "d - Color Settings", "2-Green luma multi", "Green color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
+            BlueLumaMulti = ConstructFloatConfig(0.93f, "d - Color Settings", "3-Blue luma multi", "Blue color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f);
 
-            RedBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "4-Red breadth multi", "Red color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
-            GreenBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "5-Green breadth multi", "Green color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
-            BlueBreadthMulti = ConstructFloatConfig(1f, "d - Color Settings", "6-Blue breadth multi", "Blue color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            RedBreadthMulti = ConstructFloatConfig(0.79f, "d - Color Settings", "4-Red breadth multi", "Red color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            GreenBreadthMulti = ConstructFloatConfig(0.29f, "d - Color Settings", "5-Green breadth multi", "Green color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
+            BlueBreadthMulti = ConstructFloatConfig(0.93f, "d - Color Settings", "6-Blue breadth multi", "Blue color in pixel analysis is multiplied by this to produce the breadth calculation", 0f, 1f);
 
 
             // camera rig
@@ -169,7 +171,7 @@ namespace ombarella
             // good to update meter
             //
             updateTimer += Time.deltaTime;
-            if (updateTimer > 1f / SamplesPerFrame.Value)
+            if (updateTimer > 1f / SamplesPerSec.Value)
             {
                 updateTimer = 0;
                 UpdateLightMeter();
@@ -191,7 +193,6 @@ namespace ombarella
 
         float debugScore = 0f;
         float debugScore2 = 0f;
-        List<string> layerNames;
         void UpdateLightMeter()
         {
             _lightCam.fieldOfView = CameraFOV.Value;
@@ -211,7 +212,6 @@ namespace ombarella
 
             
         }
-        bool routineRunning = false;
 
         void RecalcMeterAverage(float meterThisFrame)
         {
@@ -236,18 +236,6 @@ namespace ombarella
         {
             ConfigEntry<bool> result = ((BaseUnityPlugin)this).Config.Bind<bool>(category, descriptionShort, defaultValue, new ConfigDescription(descriptionFull, (AcceptableValueBase)null, Array.Empty<object>()));
             return result;
-        }
-        private void SetupCamera()
-        {
-            _lightCam = new Camera();
-            _lightCam = gameObject.AddComponent<Camera>();
-            _rt = new RenderTexture(_texSize, _texSize, 1, RenderTextureFormat.RGB565);
-            _rt.dimension = TextureDimension.Tex2D;
-            _rt.wrapMode = TextureWrapMode.Clamp;
-            _lightCam.targetTexture = _rt;
-            _rectReadPicture = new Rect(0, 0, _rt.width, _rt.height);
-            CameraRig.Initialize(_lightCam);
-            _lightCam.enabled = false;
         }
 
         ComputeShader _computeShader;
@@ -296,14 +284,16 @@ namespace ombarella
             _computeShader.Dispatch(_handleMain, _texSize / 8, _texSize / 8, 1);
             outputBuffer.GetData(outputColors);
 
-            float breadth = GetBreadth(outputColors);
-            float result = breadth;
+            float result = GetBreadth(outputColors);
+            if (UseLuma.Value)
+            {
+                result += GetLuma(outputColors);
+                result /= 2f;
+            }
             return result;
         }
 
-        int _handleInitialize;
         int _handleMain;
-        ComputeBuffer _histogramBuffer;
         public uint[] _histogramData;
 
 
