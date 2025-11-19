@@ -115,7 +115,7 @@ namespace ombarella
 
         public static bool IsInRaid()
         {
-            return GClass2107.InRaid;
+            return GClass2340.InRaid;
         }
 
         public static void DrawDebugLine(Vector3 from, Vector3 to)
