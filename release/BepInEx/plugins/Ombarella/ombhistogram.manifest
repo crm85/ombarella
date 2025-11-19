@@ -1,0 +1,20 @@
+ManifestFileVersion: 0
+CRC: 3428221192
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: c817e4e829841be90d83e404f4852528
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 17a3557cae3d0f9916dbe762213cf068
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: c817e4e829841be90d83e404f4852528
+HashAppended: 0
+ClassTypes:
+- Class: 72
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/Shader/GetAllPixelColors.compute
+Dependencies: []
