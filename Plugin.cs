@@ -117,7 +117,7 @@ namespace ombarella
 
             // adv settings
             CameraFOV = ConstructFloatConfig(70f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
-            LumaCoef = ConstructFloatConfig(3f, "c - Advanced Settings", "Luma coefficient", "Multiplies the luma result", 1f, 20f);
+            LumaCoef = ConstructFloatConfig(6f, "c - Advanced Settings", "Luma coefficient", "Multiplies the luma result", 1f, 20f);
 
             // color multis
             // traditional luma values : r 0.2126729, g 0.7151522, b 0.0721750
