@@ -22,9 +22,13 @@ namespace ombarella
         Player _player;
         Camera _lightCam;
         RenderTexture _rt;
-        Texture2D _tex;
-        Rect _rectReadPicture;
-        readonly int _texSize = 32;
+        int _texSize = 32;
+        bool _isDestroyed;
+        bool _asyncReadbackPending;
+        bool _asyncScoreReady;
+        float _asyncScore = 0.01f;
+        int _asyncBatchId;
+        readonly Dictionary<Player, Renderer[]> _playerRendererCache = new Dictionary<Player, Renderer[]>();
 
         public bool IsRaid { get; set; }
 
@@ -34,11 +38,18 @@ namespace ombarella
             Instance = this;
             Initialize();
         }
+
+        void OnDestroy()
+        {
+            _isDestroyed = true;
+            ReleaseRenderResources();
+        }
         
         // config toggles
         public static ConfigEntry<bool> MeterViz;
         public static ConfigEntry<bool> MasterSwitch;
         public static ConfigEntry<bool> UseLuma;
+        public static ConfigEntry<bool> UseFikaPlayerAveraging;
 
         // luma settings
 
@@ -52,6 +63,8 @@ namespace ombarella
         // adv settings
         public static ConfigEntry<float> CameraFOV;
         public static ConfigEntry<float> LumaCoef;
+        public static ConfigEntry<float> RenderTextureResolution;
+        public static ConfigEntry<bool> UseAsyncGPUReadback;
 
         // color settings
         public static ConfigEntry<float> RedLumaMulti;
@@ -65,10 +78,14 @@ namespace ombarella
 
         // camera rig settings
         public static ConfigEntry<float> CamHorizontalOffset;
+        public static ConfigEntry<bool> RenderPlayerOnly;
+        public static ConfigEntry<bool> ForceTargetPlayerRenderers;
 
         // debug values
         public static ConfigEntry<float> DebugUpdateFreq;
         public static ConfigEntry<bool> IsDebug;
+        public static ConfigEntry<bool> ShowRenderTexturePreview;
+        public static ConfigEntry<float> RenderTexturePreviewSize;
 
         // dev
         public static ConfigEntry<float> dev1;
@@ -99,6 +116,7 @@ namespace ombarella
             catch (Exception e)
             {
                 string patchName = patch.ToString();
+                Logger.LogError($"Failed to load patch {patchName}: {e}");
                 throw;
             }
         }
@@ -109,6 +127,7 @@ namespace ombarella
             MasterSwitch = ConstructBoolConfig(true, "a - Toggles", "Master Switch", "Toggle all mod functions on/off");
             MeterViz = ConstructBoolConfig(true, "a - Toggles", "Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are");
             UseLuma = ConstructBoolConfig(true, "a - Toggles", "Use Luma meter", "Toggle to incorportate 'luma' analysis, a general measure of your character's brightness");
+            UseFikaPlayerAveraging = ConstructBoolConfig(false, "a - Toggles", "Use Fika player averaging", "When enabled, target all real non-headless Fika client players and average each player's visibility from their nearest bot. Safe to leave disabled when Fika is not installed.");
 
             // main settings
             SamplesPerSec = ConstructFloatConfig(1f, "b - Main Settings", "1-Light samples per second", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f);
@@ -118,6 +137,8 @@ namespace ombarella
             // adv settings
             CameraFOV = ConstructFloatConfig(70f, "c - Advanced Settings", "CameraFOV", "Size of light camera FOV", 10f, 170f);
             LumaCoef = ConstructFloatConfig(6f, "c - Advanced Settings", "Luma coefficient", "Multiplies the luma result", 1f, 20f);
+            RenderTextureResolution = ConstructFloatConfig(64f, "c - Advanced Settings", "Render texture resolution", "Resolution of the light camera render texture. Applied before raid start and rounded to the nearest multiple of 8.", 16f, 512f);
+            UseAsyncGPUReadback = ConstructBoolConfig(true, "c - Advanced Settings", "Use async GPU readback", "Avoids blocking the main thread while reading the light camera texture. Disable to use the old synchronous compute readback path.");
 
             // color multis
             // traditional luma values : r 0.2126729, g 0.7151522, b 0.0721750
@@ -132,10 +153,14 @@ namespace ombarella
 
             // camera rig
             CamHorizontalOffset = ConstructFloatConfig(4f, "e - Camera Rig Settings", "Camera horizontal offset", "Distance between the camera and the player focus point on horizontal plane", 0.1f, 5f);
+            RenderPlayerOnly = ConstructBoolConfig(true, "e - Camera Rig Settings", "Render player only", "When enabled, the light camera renders the target player against a black background");
+            ForceTargetPlayerRenderers = ConstructBoolConfig(true, "e - Camera Rig Settings", "Force target player renderers", "Temporarily forces the sampled player's renderers visible and renderable by the light camera, then restores them");
 
             // debug
             IsDebug = ConstructBoolConfig(false, "y - Debug", "1) Enable debug logging", "");
             DebugUpdateFreq = ConstructFloatConfig(1f, "y - Debug", "2) Debug updates per second", "How frequently the debug logger updates per second", 1f, 10f);
+            ShowRenderTexturePreview = ConstructBoolConfig(false, "y - Debug", "3) Show render texture preview", "Draws the light-meter render texture in the game window for debugging");
+            RenderTexturePreviewSize = ConstructFloatConfig(256f, "y - Debug", "4) Render texture preview size", "Size of the render texture debug preview in pixels", 64f, 512f);
 
             // dev
             //dev1 = ConstructFloatConfig(1f, "z - Dev", "dev1", "", 0f, 100f);
@@ -161,7 +186,7 @@ namespace ombarella
             {
                 _player = Utils.GetMainPlayer();
             }
-            if (_player == null)
+            if (_player == null && !UseFikaPlayerAveraging.Value)
             {
                 Utils.LogError("Unable to return player, meter updates aborted");
                 return;
@@ -182,12 +207,16 @@ namespace ombarella
         public void CleanupRaid()
         {
             _player = null;
+            _playerRendererCache.Clear();
+            _asyncReadbackPending = false;
+            _asyncScoreReady = false;
             IsRaid = false;
         }
 
         public void StartRaid()
         {
             _player = Utils.GetMainPlayer();
+            SetupRenderTexture();
             IsRaid = true;
         }
 
@@ -201,16 +230,143 @@ namespace ombarella
             {
                 return;
             }
-            CameraRig.RepositionCamera(playersList);
-            //if (!routineRunning)
-            //{
-            //    StartCoroutine(LightMeterRoutine());
-            //}
-            float score = DispatchShader();
+
+            if (UseAsyncGPUReadback.Value && SystemInfo.supportsAsyncGPUReadback)
+            {
+                ConsumeAsyncLightMeterScore();
+                TryScheduleAsyncLightMeterScore(playersList);
+                return;
+            }
+
+            float score;
+            if (!TryGetLightMeterScore(playersList, out score))
+            {
+                return;
+            }
+
             debugScore = score;
             RecalcMeterAverage(score);
 
             
+        }
+
+        void ConsumeAsyncLightMeterScore()
+        {
+            if (!_asyncScoreReady)
+            {
+                return;
+            }
+
+            _asyncScoreReady = false;
+            debugScore = _asyncScore;
+            RecalcMeterAverage(_asyncScore);
+        }
+
+        void TryScheduleAsyncLightMeterScore(List<Player> playersList)
+        {
+            if (_asyncReadbackPending)
+            {
+                return;
+            }
+
+            if (UseFikaPlayerAveraging.Value)
+            {
+                ScheduleAsyncFikaAveragedLightMeterScore(playersList);
+                return;
+            }
+
+            Player player = Utils.GetMainPlayer();
+            if (!CameraRig.TryRepositionCamera(player, playersList))
+            {
+                return;
+            }
+
+            AsyncScoreBatch batch = CreateAsyncScoreBatch(1);
+            RenderAndRequestScoreReadback(player, batch);
+        }
+
+        void ScheduleAsyncFikaAveragedLightMeterScore(List<Player> playersList)
+        {
+            List<Player> targetPlayers = Utils.GetActualHumanPlayers(playersList);
+            List<Player> botPlayers = Utils.GetBotPlayers(playersList);
+
+            if (targetPlayers.Count == 0 || botPlayers.Count == 0)
+            {
+                return;
+            }
+
+            List<Player> validTargets = new List<Player>();
+            foreach (Player targetPlayer in targetPlayers)
+            {
+                if (CameraRig.TryRepositionCamera(targetPlayer, botPlayers))
+                {
+                    validTargets.Add(targetPlayer);
+                }
+            }
+
+            if (validTargets.Count == 0)
+            {
+                return;
+            }
+
+            AsyncScoreBatch batch = CreateAsyncScoreBatch(validTargets.Count);
+            foreach (Player targetPlayer in validTargets)
+            {
+                CameraRig.TryRepositionCamera(targetPlayer, botPlayers);
+                RenderAndRequestScoreReadback(targetPlayer, batch);
+            }
+        }
+
+        bool TryGetLightMeterScore(List<Player> playersList, out float score)
+        {
+            if (UseFikaPlayerAveraging.Value)
+            {
+                return TryGetFikaAveragedLightMeterScore(playersList, out score);
+            }
+
+            score = 0f;
+            Player player = Utils.GetMainPlayer();
+            if (!CameraRig.TryRepositionCamera(player, playersList))
+            {
+                return false;
+            }
+
+            score = RenderAndDispatchShader(player);
+            return true;
+        }
+
+        bool TryGetFikaAveragedLightMeterScore(List<Player> playersList, out float score)
+        {
+            score = 0f;
+            List<Player> targetPlayers = Utils.GetActualHumanPlayers(playersList);
+            List<Player> botPlayers = Utils.GetBotPlayers(playersList);
+
+            if (targetPlayers.Count == 0 || botPlayers.Count == 0)
+            {
+                return false;
+            }
+
+            float scoreSum = 0f;
+            int scoreCount = 0;
+
+            foreach (Player targetPlayer in targetPlayers)
+            {
+                if (!CameraRig.TryRepositionCamera(targetPlayer, botPlayers))
+                {
+                    continue;
+                }
+
+                scoreSum += RenderAndDispatchShader(targetPlayer);
+                scoreCount++;
+            }
+
+            if (scoreCount == 0)
+            {
+                return false;
+            }
+
+            score = scoreSum / scoreCount;
+            return true;
         }
 
         void RecalcMeterAverage(float meterThisFrame)
@@ -252,18 +408,31 @@ namespace ombarella
 
         void SetupRenderTexture()
         {
-            _rt = new RenderTexture(_texSize, _texSize, 4, RenderTextureFormat.RGB565);
-            _rt.enableRandomWrite = true;
-            _rt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
-            _rt.depth = 24;
+            int configuredTexSize = GetConfiguredTextureSize();
+            if (_rt != null && outputBuffer != null && configuredTexSize == _texSize)
+            {
+                ApplyLightCameraSettings(0);
+                return;
+            }
+
+            ReleaseRenderResources();
+            _texSize = configuredTexSize;
+
+            _rt = new RenderTexture(_texSize, _texSize, 16, RenderTextureFormat.ARGB32);
+            _rt.enableRandomWrite = false;
+            _rt.depth = 16;
             _rt.stencilFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.None;
             _rt.dimension = TextureDimension.Tex2D;
             _rt.Create();
 
-            _lightCam = new Camera();
-            _lightCam = gameObject.AddComponent<Camera>();
+            if (_lightCam == null)
+            {
+                _lightCam = gameObject.AddComponent<Camera>();
+            }
+
             _lightCam.targetTexture = _rt;
-            _lightCam.renderingPath = RenderingPath.DeferredShading;
+            _lightCam.enabled = false;
+            ApplyLightCameraSettings(0);
             CameraRig.Initialize(_lightCam);
 
             // Prepare output buffer
@@ -275,6 +444,107 @@ namespace ombarella
 
             _computeShader.SetTexture(_handleMain, "textureInput", _rt);
             _computeShader.SetBuffer(_handleMain, "outputBuffer", outputBuffer);
+        }
+
+        int GetConfiguredTextureSize()
+        {
+            int configuredValue = Mathf.RoundToInt(RenderTextureResolution.Value);
+            configuredValue = Mathf.Clamp(configuredValue, 16, 512);
+            return Mathf.Max(8, Mathf.RoundToInt(configuredValue / 8f) * 8);
+        }
+
+        void ReleaseRenderResources()
+        {
+            _asyncReadbackPending = false;
+            _asyncScoreReady = false;
+            _asyncBatchId++;
+
+            if (outputBuffer != null)
+            {
+                outputBuffer.Release();
+                outputBuffer = null;
+            }
+
+            if (_rt != null)
+            {
+                _rt.Release();
+                Destroy(_rt);
+                _rt = null;
+            }
+        }
+
+        int GetPlayerLayerMask()
+        {
+            int playerLayer = LayerMask.NameToLayer("Player");
+            if (playerLayer < 0)
+            {
+                return 0;
+            }
+
+            return 1 << playerLayer;
+        }
+
+        int GetRendererLayerMask(Renderer[] renderers)
+        {
+            int mask = 0;
+            if (renderers == null)
+            {
+                return mask;
+            }
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                mask |= 1 << renderer.gameObject.layer;
+            }
+
+            return mask;
+        }
+
+        int GetLightCameraCullingMask(Renderer[] targetRenderers)
+        {
+            if (!RenderPlayerOnly.Value)
+            {
+                return -1;
+            }
+
+            int playerLayerMask = GetPlayerLayerMask();
+            if (ForceTargetPlayerRenderers.Value && playerLayerMask != 0)
+            {
+                return playerLayerMask;
+            }
+
+            int rendererLayerMask = GetRendererLayerMask(targetRenderers);
+            if (rendererLayerMask != 0)
+            {
+                return rendererLayerMask;
+            }
+
+            return playerLayerMask != 0 ? playerLayerMask : -1;
+        }
+
+        void ApplyLightCameraSettings(int targetPlayerCullingMask)
+        {
+            if (_lightCam == null)
+            {
+                return;
+            }
+
+            int effectiveCullingMask = targetPlayerCullingMask != 0 ? targetPlayerCullingMask : GetLightCameraCullingMask(null);
+            _lightCam.clearFlags = RenderPlayerOnly.Value ? CameraClearFlags.Color : CameraClearFlags.Skybox;
+            _lightCam.backgroundColor = Color.black;
+            _lightCam.cullingMask = effectiveCullingMask;
+            _lightCam.renderingPath = RenderPlayerOnly.Value ? RenderingPath.Forward : RenderingPath.DeferredShading;
+            _lightCam.allowHDR = false;
+            _lightCam.allowMSAA = false;
+            _lightCam.useOcclusionCulling = false;
+            _lightCam.nearClipPlane = 0.01f;
+            _lightCam.farClipPlane = RenderPlayerOnly.Value ? 20f : 200f;
         }
 
         Color[] outputColors;
@@ -291,6 +561,192 @@ namespace ombarella
                 result /= 2f;
             }
             return result;
+        }
+
+        float RenderAndDispatchShader(Player targetPlayer)
+        {
+            Renderer[] targetRenderers = GetCachedPlayerRenderers(targetPlayer);
+            ApplyLightCameraSettings(GetLightCameraCullingMask(targetRenderers));
+            using (new TargetPlayerRenderScope(targetRenderers, ForceTargetPlayerRenderers.Value, RenderPlayerOnly.Value))
+            {
+                _lightCam.Render();
+            }
+            return DispatchShader();
+        }
+
+        AsyncScoreBatch CreateAsyncScoreBatch(int requestCount)
+        {
+            _asyncReadbackPending = true;
+            _asyncBatchId++;
+            return new AsyncScoreBatch
+            {
+                Id = _asyncBatchId,
+                Pending = requestCount,
+                Settings = CaptureScoreSettings()
+            };
+        }
+
+        void RenderAndRequestScoreReadback(Player targetPlayer, AsyncScoreBatch batch)
+        {
+            Renderer[] targetRenderers = GetCachedPlayerRenderers(targetPlayer);
+            ApplyLightCameraSettings(GetLightCameraCullingMask(targetRenderers));
+            using (new TargetPlayerRenderScope(targetRenderers, ForceTargetPlayerRenderers.Value, RenderPlayerOnly.Value))
+            {
+                _lightCam.Render();
+            }
+
+            AsyncGPUReadback.Request(_rt, 0, TextureFormat.RGBA32, request => HandleAsyncScoreReadback(request, batch));
+        }
+
+        void HandleAsyncScoreReadback(AsyncGPUReadbackRequest request, AsyncScoreBatch batch)
+        {
+            if (_isDestroyed || batch.Id != _asyncBatchId)
+            {
+                return;
+            }
+
+            if (!request.hasError && TryCalculateScore(request, batch.Settings, out float score))
+            {
+                batch.ScoreSum += score;
+                batch.ScoreCount++;
+            }
+
+            batch.Pending--;
+            if (batch.Pending > 0)
+            {
+                return;
+            }
+
+            _asyncReadbackPending = false;
+            if (batch.ScoreCount == 0)
+            {
+                return;
+            }
+
+            _asyncScore = batch.ScoreSum / batch.ScoreCount;
+            _asyncScoreReady = true;
+        }
+
+        ScoreSettings CaptureScoreSettings()
+        {
+            return new ScoreSettings
+            {
+                UseLuma = UseLuma.Value,
+                LumaCoef = LumaCoef.Value,
+                RedLumaMulti = RedLumaMulti.Value,
+                GreenLumaMulti = GreenLumaMulti.Value,
+                BlueLumaMulti = BlueLumaMulti.Value,
+                RedBreadthMulti = RedBreadthMulti.Value,
+                GreenBreadthMulti = GreenBreadthMulti.Value,
+                BlueBreadthMulti = BlueBreadthMulti.Value
+            };
+        }
+
+        bool TryCalculateScore(AsyncGPUReadbackRequest request, ScoreSettings settings, out float score)
+        {
+            score = 0f;
+            var pixels = request.GetData<Color32>();
+            int pixelCount = pixels.Length;
+            if (pixelCount == 0)
+            {
+                return false;
+            }
+
+            int rLow = 255;
+            int gLow = 255;
+            int bLow = 255;
+            int rHigh = 0;
+            int gHigh = 0;
+            int bHigh = 0;
+
+            float rLumaSum = 0f;
+            float gLumaSum = 0f;
+            float bLumaSum = 0f;
+
+            for (int i = 0; i < pixelCount; i++)
+            {
+                Color32 pixel = pixels[i];
+
+                if (pixel.r < rLow) rLow = pixel.r;
+                if (pixel.g < gLow) gLow = pixel.g;
+                if (pixel.b < bLow) bLow = pixel.b;
+
+                if (pixel.r > rHigh) rHigh = pixel.r;
+                if (pixel.g > gHigh) gHigh = pixel.g;
+                if (pixel.b > bHigh) bHigh = pixel.b;
+
+                if (settings.UseLuma)
+                {
+                    rLumaSum += pixel.r * settings.RedLumaMulti;
+                    gLumaSum += pixel.g * settings.BlueLumaMulti;
+                    bLumaSum += pixel.b * settings.GreenLumaMulti;
+                }
+            }
+
+            float breadth = ((rHigh - rLow) * settings.RedBreadthMulti + (gHigh - gLow) * settings.GreenBreadthMulti + (bHigh - bLow) * settings.BlueBreadthMulti) / (255f * 3f);
+            debugScore2 = breadth;
+            score = breadth;
+
+            if (settings.UseLuma)
+            {
+                float luma = (rLumaSum + gLumaSum + bLumaSum) / (255f * pixelCount);
+                luma *= settings.LumaCoef;
+                score += luma;
+                score /= 2f;
+            }
+
+            return !float.IsNaN(score) && !float.IsInfinity(score);
+        }
+
+        Renderer[] GetCachedPlayerRenderers(Player targetPlayer)
+        {
+            if (targetPlayer == null)
+            {
+                return Array.Empty<Renderer>();
+            }
+
+            if (_playerRendererCache.TryGetValue(targetPlayer, out Renderer[] renderers) && renderers != null && !HasNullRenderer(renderers))
+            {
+                return renderers;
+            }
+
+            renderers = targetPlayer.GetComponentsInChildren<Renderer>(true);
+            _playerRendererCache[targetPlayer] = renderers;
+            return renderers;
+        }
+
+        bool HasNullRenderer(Renderer[] renderers)
+        {
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] == null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        class AsyncScoreBatch
+        {
+            public int Id;
+            public int Pending;
+            public int ScoreCount;
+            public float ScoreSum;
+            public ScoreSettings Settings;
+        }
+
+        struct ScoreSettings
+        {
+            public bool UseLuma;
+            public float LumaCoef;
+            public float RedLumaMulti;
+            public float GreenLumaMulti;
+            public float BlueLumaMulti;
+            public float RedBreadthMulti;
+            public float GreenBreadthMulti;
+            public float BlueBreadthMulti;
         }
 
         int _handleMain;
@@ -320,23 +776,140 @@ namespace ombarella
 
         void OnGUI()
         {
-            if (!MeterViz.Value || !MasterSwitch.Value)
+            if (!MasterSwitch.Value)
             { 
                 return; 
             }
             if (Utils.IsInRaid())
             {
-                efficiencyIndicatorStyle.normal.textColor = Color.grey;
-                efficiencyIndicatorStyle.fontSize = 20;
-                float indicatorHorizontalPos = 20f;
-                float indicatorVerticalPos = 10f;
-                string input = Visualiser.GetLevelString(_finalValueLerped, false);
-                GUI.Label(new Rect(indicatorHorizontalPos, indicatorVerticalPos, 40f, 40f), input, efficiencyIndicatorStyle);
+                if (MeterViz.Value)
+                {
+                    efficiencyIndicatorStyle.normal.textColor = Color.grey;
+                    efficiencyIndicatorStyle.fontSize = 20;
+                    float indicatorHorizontalPos = 20f;
+                    float indicatorVerticalPos = 10f;
+                    string input = Visualiser.GetLevelString(_finalValueLerped, false);
+                    GUI.Label(new Rect(indicatorHorizontalPos, indicatorVerticalPos, 40f, 40f), input, efficiencyIndicatorStyle);
+                }
+
                 if (IsDebug.Value)
                 {
-                    string debugString = string.Format($"luma is {debugScore}, breadth is {debugScore2}");
-                    GUI.Label(new Rect(indicatorHorizontalPos, indicatorVerticalPos + 40f, 40f, 40f), debugString, efficiencyIndicatorStyle);
+                    if (MeterViz.Value)
+                    {
+                        string debugString = string.Format($"luma is {debugScore}, breadth is {debugScore2}");
+                        GUI.Label(new Rect(20f, 50f, 40f, 40f), debugString, efficiencyIndicatorStyle);
+                    }
                 }
+
+                DrawRenderTexturePreview();
+            }
+        }
+
+        void DrawRenderTexturePreview()
+        {
+            if (!ShowRenderTexturePreview.Value || _rt == null)
+            {
+                return;
+            }
+
+            float previewSize = RenderTexturePreviewSize.Value;
+            Rect previewRect = new Rect(20f, 80f, previewSize, previewSize);
+            Rect frameRect = new Rect(previewRect.x - 2f, previewRect.y - 2f, previewRect.width + 4f, previewRect.height + 4f);
+
+            Color previousColor = GUI.color;
+            GUI.color = Color.black;
+            GUI.DrawTexture(frameRect, Texture2D.whiteTexture, ScaleMode.StretchToFill);
+            GUI.color = Color.white;
+            GUI.DrawTexture(previewRect, _rt, ScaleMode.ScaleToFit, false);
+            GUI.color = previousColor;
+        }
+
+        sealed class TargetPlayerRenderScope : IDisposable
+        {
+            struct RendererState
+            {
+                public Renderer Renderer;
+                public bool Enabled;
+                public bool ForceRenderingOff;
+                public ShadowCastingMode ShadowCastingMode;
+                public int Layer;
+                public bool HasSkinnedMeshRenderer;
+                public bool UpdateWhenOffscreen;
+            }
+
+            readonly List<RendererState> _rendererStates = new List<RendererState>();
+            bool _disposed;
+
+            public TargetPlayerRenderScope(Renderer[] renderers, bool forceRenderers, bool forcePlayerLayer)
+            {
+                if (!forceRenderers || renderers == null || renderers.Length == 0)
+                {
+                    return;
+                }
+
+                int playerLayer = LayerMask.NameToLayer("Player");
+                bool canForcePlayerLayer = forcePlayerLayer && playerLayer >= 0;
+
+                foreach (Renderer renderer in renderers)
+                {
+                    if (renderer == null)
+                    {
+                        continue;
+                    }
+
+                    SkinnedMeshRenderer skinnedMeshRenderer = renderer as SkinnedMeshRenderer;
+                    _rendererStates.Add(new RendererState
+                    {
+                        Renderer = renderer,
+                        Enabled = renderer.enabled,
+                        ForceRenderingOff = renderer.forceRenderingOff,
+                        ShadowCastingMode = renderer.shadowCastingMode,
+                        Layer = renderer.gameObject.layer,
+                        HasSkinnedMeshRenderer = skinnedMeshRenderer != null,
+                        UpdateWhenOffscreen = skinnedMeshRenderer != null && skinnedMeshRenderer.updateWhenOffscreen
+                    });
+
+                    renderer.enabled = true;
+                    renderer.forceRenderingOff = false;
+                    renderer.shadowCastingMode = ShadowCastingMode.On;
+                    if (skinnedMeshRenderer != null)
+                    {
+                        skinnedMeshRenderer.updateWhenOffscreen = true;
+                    }
+
+                    if (canForcePlayerLayer)
+                    {
+                        renderer.gameObject.layer = playerLayer;
+                    }
+                }
+            }
+
+            public void Dispose()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                for (int i = _rendererStates.Count - 1; i >= 0; i--)
+                {
+                    RendererState state = _rendererStates[i];
+                    if (state.Renderer == null)
+                    {
+                        continue;
+                    }
+
+                    state.Renderer.enabled = state.Enabled;
+                    state.Renderer.forceRenderingOff = state.ForceRenderingOff;
+                    state.Renderer.shadowCastingMode = state.ShadowCastingMode;
+                    state.Renderer.gameObject.layer = state.Layer;
+                    if (state.HasSkinnedMeshRenderer)
+                    {
+                        ((SkinnedMeshRenderer)state.Renderer).updateWhenOffscreen = state.UpdateWhenOffscreen;
+                    }
+                }
+
+                _disposed = true;
             }
         }
 

@@ -15,41 +15,45 @@ namespace ombarella
         public static void RepositionCamera(List<Player> targetList)
         {
             Player player = Utils.GetMainPlayer();
+            TryRepositionCamera(player, targetList);
+        }
 
-            if (targetList.Count == 1 && targetList[0] == player)
+        public static bool TryRepositionCamera(Player player, List<Player> observerList)
+        {
+            if (!Utils.IsLightMeterUsablePlayer(player) || observerList == null || observerList.Count == 0)
             {
-                return;
+                return false;
             }
 
-            float distance = 0;
+            float closestDistance = float.MaxValue;
             Player closestBot = null;
-            foreach (var bot in targetList)
+            foreach (var bot in observerList)
             {
-                if (bot == Utils.GetMainPlayer())
+                if (bot == player || !Utils.IsLightMeterUsablePlayer(bot))
                 {
                     continue;
                 }
-                else if (distance == 0)
+
+                float distance = Vector3.Distance(bot.Position, player.Position);
+                if (float.IsNaN(distance) || float.IsInfinity(distance))
                 {
-                    distance = Vector3.Distance(bot.Position, player.Position);
+                    continue;
+                }
+
+                if (distance < closestDistance)
+                {
+                    closestDistance = distance;
                     closestBot = bot;
-                    continue;
-                }
-                else
-                {
-                    float lastDistance = Vector3.Distance(bot.Position, player.Position);
-                    if (lastDistance < distance)
-                    {
-                        distance = lastDistance;
-                        closestBot = bot;
-                    }
                 }
             }
 
-            if (closestBot == null) return;
+            if (closestBot == null)
+            {
+                return false;
+            }
 
             Vector3 newCamPos = closestBot.PlayerBones.Head.position;
-            Vector3 playerPosAdjusted = player.PlayerBody.PlayerBones.Ribcage.position;
+            Vector3 playerPosAdjusted = player.PlayerBones.Ribcage.position;
 
             //
             // old random logic
@@ -64,10 +68,16 @@ namespace ombarella
             //Vector3 newCamPos = playerPosAdjusted + rotDirection;
 
             Vector3 vectorCameraToPlayer = playerPosAdjusted - newCamPos;
+            if (vectorCameraToPlayer.sqrMagnitude <= 0.0001f)
+            {
+                return false;
+            }
+
             vectorCameraToPlayer = Vector3.ClampMagnitude(vectorCameraToPlayer, Plugin.CamHorizontalOffset.Value);
             newCamPos = playerPosAdjusted + -vectorCameraToPlayer;
             _lightCam.gameObject.transform.position = newCamPos;
             _lightCam.gameObject.transform.rotation = Quaternion.LookRotation(vectorCameraToPlayer);
+            return true;
         }
     }
 }

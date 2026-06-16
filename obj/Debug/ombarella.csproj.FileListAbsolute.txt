@@ -15,7 +15,6 @@ C:\repos\ombarella\bin\Debug\MonoMod.Utils.dll
 C:\repos\ombarella\bin\Debug\MonoMod.RuntimeDetour.dll
 C:\repos\ombarella\bin\Debug\netstandard.dll
 C:\repos\ombarella\bin\Debug\Unity.Postprocessing.Runtime.dll
-C:\repos\ombarella\bin\Debug\UnityEngine.PhysicsModule.dll
 C:\repos\ombarella\bin\Debug\Assembly-CSharp-firstpass.dll
 C:\repos\ombarella\bin\Debug\UnityEngine.AnimationModule.dll
 C:\repos\ombarella\bin\Debug\UnityEngine.UI.dll
@@ -127,3 +126,4 @@ C:\repos\ombarella\obj\Debug\ombarella.csproj.CoreCompileInputs.cache
 C:\repos\ombarella\obj\Debug\ombarella.csproj.Up2Date
 C:\repos\ombarella\obj\Debug\ombarella.dll
 C:\repos\ombarella\obj\Debug\ombarella.pdb
+C:\repos\ombarella\bin\Debug\UnityEngine.PhysicsModule.dll
