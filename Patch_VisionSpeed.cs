@@ -9,7 +9,7 @@ namespace ombarella
     {
         protected override MethodBase GetTargetMethod()
         {
-            return AccessTools.Method(typeof(EnemyInfo), nameof(EnemyInfo.method_7));
+            return AccessTools.Method(typeof(EnemyInfo), nameof(EnemyInfo.method_9));
         }
 
         [PatchPostfix]
@@ -27,6 +27,7 @@ namespace ombarella
 
                 // modify vision speed
                 float newValue = Plugin.Instance.FinalLightMeter;
+                
                 if (__instance.HaveNightVision())
                 {
                     newValue = Mathf.Lerp(newValue, 1f, 0.7f);

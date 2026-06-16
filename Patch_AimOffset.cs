@@ -10,7 +10,7 @@ namespace ombarella
     {
         protected override MethodBase GetTargetMethod()
         {
-            return AccessTools.Method(typeof(BotAimingClass), "method_13", (Type[])null, (Type[])null);
+            return AccessTools.Method(typeof(BotAimingClass), "method_13");
         }
 
         [PatchPostfix]
@@ -21,17 +21,18 @@ namespace ombarella
                 {
                     return;
                 }
+                
                 if (__instance == null)
                 {
                     return;
                 }
 
                 // modify aim offset
-                float aimOffset = __instance.float_13;
+                float aimOffset = __instance.Float_13;
                 float aimOffsetCoef = (1f - Plugin.Instance.FinalLightMeter) * 100f;
                 aimOffsetCoef *= Plugin.AimNerf.Value;
                 aimOffset *= aimOffsetCoef;
-                Vector3 vector3_ = __instance.vector3_4;
+                Vector3 vector3_ = __instance.Vector3_4;
                 Vector3 endTargetPoint = __instance.RealTargetPoint + vector3_ * aimOffset;
                 __instance.EndTargetPoint = endTargetPoint;
             }
