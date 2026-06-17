@@ -1,17 +1,18 @@
-﻿using System.Collections.Generic;
-using UnityEngine;
-using Random = UnityEngine.Random;
+using System.Collections.Generic;
 using EFT;
+using UnityEngine;
 
 namespace ombarella
 {
     public static class CameraRig
     {
         public static Camera _lightCam;
+
         public static void Initialize(Camera camera)
         {
             _lightCam = camera;
         }
+
         public static void RepositionCamera(List<Player> targetList)
         {
             Player player = Utils.GetMainPlayer();
@@ -20,14 +21,21 @@ namespace ombarella
 
         public static bool TryRepositionCamera(Player player, List<Player> observerList)
         {
-            if (!Utils.IsLightMeterUsablePlayer(player) || observerList == null || observerList.Count == 0)
+            Vector3 focusPoint;
+            return TryRepositionCamera(player, observerList, out focusPoint);
+        }
+
+        public static bool TryRepositionCamera(Player player, List<Player> observerList, out Vector3 focusPoint)
+        {
+            focusPoint = Vector3.zero;
+            if (!Utils.IsLightMeterUsablePlayer(player) || observerList == null || observerList.Count == 0 || _lightCam == null)
             {
                 return false;
             }
 
             float closestDistance = float.MaxValue;
             Player closestBot = null;
-            foreach (var bot in observerList)
+            foreach (Player bot in observerList)
             {
                 if (bot == player || !Utils.IsLightMeterUsablePlayer(bot))
                 {
@@ -52,32 +60,51 @@ namespace ombarella
                 return false;
             }
 
-            Vector3 newCamPos = closestBot.PlayerBones.Head.position;
-            Vector3 playerPosAdjusted = player.PlayerBones.Ribcage.position;
+            focusPoint = GetPlayerFocusPoint(player);
+            Vector3 observerToFocus = focusPoint - closestBot.PlayerBones.Head.position;
+            if (observerToFocus.sqrMagnitude <= 0.0001f)
+            {
+                return false;
+            }
 
-            //
-            // old random logic
-            //
+            observerToFocus = Vector3.ClampMagnitude(observerToFocus, Plugin.CamHorizontalOffset.Value);
+            Vector3 cameraPosition = focusPoint - observerToFocus;
+            _lightCam.gameObject.transform.position = cameraPosition;
+            _lightCam.gameObject.transform.rotation = Quaternion.LookRotation(focusPoint - cameraPosition);
+            return true;
+        }
 
-            //float randomAngle = Random.Range(1f, 360f);
-            //Quaternion cameraAngleYAxis = Quaternion.AngleAxis(randomAngle, Vector3.up);
-            //Vector3 posOffsetFromPlayer = playerPosAdjusted;
-            //posOffsetFromPlayer.x += Plugin.CamHorizontalOffset.Value;
-            //Vector3 cameraOffsetFromPlayer = posOffsetFromPlayer - playerPosAdjusted;
-            //Vector3 rotDirection = cameraAngleYAxis * cameraOffsetFromPlayer;
-            //Vector3 newCamPos = playerPosAdjusted + rotDirection;
+        public static bool TryRepositionCameraOnOrbit(Player player, float radius, float heightOffset, float angleDegrees, out Vector3 focusPoint)
+        {
+            focusPoint = Vector3.zero;
+            if (!Utils.IsLightMeterUsablePlayer(player) || _lightCam == null)
+            {
+                return false;
+            }
 
-            Vector3 vectorCameraToPlayer = playerPosAdjusted - newCamPos;
+            focusPoint = GetPlayerFocusPoint(player);
+            if (!Utils.IsFinite(focusPoint))
+            {
+                return false;
+            }
+
+            radius = Mathf.Max(0.1f, radius);
+            Vector3 orbitOffset = Quaternion.Euler(0f, angleDegrees, 0f) * (Vector3.forward * radius);
+            Vector3 cameraPosition = focusPoint + orbitOffset + Vector3.up * heightOffset;
+            Vector3 vectorCameraToPlayer = focusPoint - cameraPosition;
             if (vectorCameraToPlayer.sqrMagnitude <= 0.0001f)
             {
                 return false;
             }
 
-            vectorCameraToPlayer = Vector3.ClampMagnitude(vectorCameraToPlayer, Plugin.CamHorizontalOffset.Value);
-            newCamPos = playerPosAdjusted + -vectorCameraToPlayer;
-            _lightCam.gameObject.transform.position = newCamPos;
+            _lightCam.gameObject.transform.position = cameraPosition;
             _lightCam.gameObject.transform.rotation = Quaternion.LookRotation(vectorCameraToPlayer);
             return true;
+        }
+
+        public static Vector3 GetPlayerFocusPoint(Player player)
+        {
+            return player.PlayerBones.Ribcage.position + Vector3.up * Plugin.CameraFocusHeightOffset.Value;
         }
     }
 }

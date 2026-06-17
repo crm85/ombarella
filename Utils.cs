@@ -195,12 +195,12 @@ namespace ombarella
             return field;
         }
 
-        static bool IsFinite(Vector3 value)
+        public static bool IsFinite(Vector3 value)
         {
             return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
         }
 
-        static bool IsFinite(float value)
+        public static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);
         }
@@ -251,16 +251,6 @@ namespace ombarella
         public static void LogError(string error)
         {
             Logger.LogError((object)error);
-        }
-
-        public static void Update(float dt)
-        {
-            //_logUpdateTimer += dt;
-            //float logUpdateInterval = 1f / Plugin.DebugUpdateFreq.Value;
-            //if (_logUpdateTimer > logUpdateInterval)
-            //{
-            //    _logUpdateTimer = _logUpdateTimer - logUpdateInterval;
-            //}
         }
 
         public static bool IsInRaid()
