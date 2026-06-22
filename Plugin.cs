@@ -18,7 +18,7 @@ namespace ombarella
 
         const string modGUID = "Ombarella";
         const string modName = "Ombarella";
-        const string modVersion = "0.4";
+        const string modVersion = "0.5.0";
         const string ConfigSectionGeneral = "a - General";
         const string ConfigSectionCamera = "b - Camera";
         const string ConfigSectionLuma = "c - Luma";
@@ -84,7 +84,6 @@ namespace ombarella
         public static ConfigEntry<float> LumaColorDistribution;
 
         // camera rig settings
-        public static ConfigEntry<float> CamHorizontalOffset;
         public static ConfigEntry<float> CameraFocusHeightOffset;
         public static ConfigEntry<bool> UseOrbitCameraSampling;
         public static ConfigEntry<float> OrbitCameraRadius;
@@ -135,7 +134,7 @@ namespace ombarella
             MasterSwitch = ConstructBoolConfig(true, ConfigSectionGeneral, "1-Master switch", "Toggle all mod functions on/off", OldConfig("a - Toggles", "Master Switch"));
             MeterViz = ConstructBoolConfig(true, ConfigSectionGeneral, "2-Enable light meter indicator", "Visual representation of how much you are being lit and how visible you are", OldConfig("a - Toggles", "Enable light meter indicator"));
             UseFikaPlayerAveraging = ConstructBoolConfig(false, ConfigSectionGeneral, "3-Use Fika player averaging", "When enabled, target all real non-headless Fika client players and average each player's visibility from their nearest bot. Safe to leave disabled when Fika is not installed.", OldConfig("a - Toggles", "Use Fika player averaging"));
-            SamplesPerSec = ConstructFloatConfig(15f, ConfigSectionGeneral, "4-Light samples per second", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f, OldConfig("b - Main Settings", "1-Light samples per second"));
+            SamplesPerSec = ConstructFloatConfig(60f, ConfigSectionGeneral, "4-Light samples per second", "Main throttle of the mod; higher = more accurate reading / less perf", 1f, 60f, OldConfig("b - Main Settings", "1-Light samples per second"));
             MeterAverageSamples = ConstructFloatConfig(15f, ConfigSectionGeneral, "5-Light meter average samples", "Number of valid light samples to average before applying the result. Higher values smooth noisy orbit sampling.", 1f, 600f, OldConfig("b - Main Settings", "2-Light meter average samples"));
             MeterAttenuationCoef = ConstructFloatConfig(1f, ConfigSectionGeneral, "6-Light meter strength", "Determines how quickly bots can spot you per your visiblity level (100% = bots get full effect, slower recognition time)", 0f, 1f, OldConfig("b - Main Settings", "3-Light meter strength"));
             AimNerf = ConstructFloatConfig(0.03f, ConfigSectionGeneral, "7-Bot aim handicap", "Determines how much bots' aim is affected by your visibility level (higher = bots' aim more nerfed by your viz level; zero = effect is removed", 0f, 0.1f, OldConfig("b - Main Settings", "4-Bot aim handicap"));
@@ -145,15 +144,14 @@ namespace ombarella
             CameraFOV = ConstructFloatConfig(30f, ConfigSectionCamera, "1-Camera FOV", "Size of light camera FOV", 10f, 170f, OldConfig("c - Advanced Settings", "CameraFOV"));
             RenderTextureResolution = ConstructFloatConfig(128f, ConfigSectionCamera, "2-Render texture resolution", "Resolution of each light camera render texture. Applied before raid start and rounded to the nearest multiple of 8.", 16f, 512f, OldConfig("c - Advanced Settings", "Render texture resolution"));
             CameraFocusHeightOffset = ConstructFloatConfig(-0.2f, ConfigSectionCamera, "3-Camera focus height offset", "Vertical offset from the player's ribcage bone. Negative values focus lower on the chest.", -1f, 1f, OldConfig("e - Camera Rig Settings", "Camera focus height offset"));
-            CamHorizontalOffset = ConstructFloatConfig(4f, ConfigSectionCamera, "4-Camera horizontal offset", "Distance between the camera and the player focus point on horizontal plane", 0.1f, 5f, OldConfig("e - Camera Rig Settings", "Camera horizontal offset"));
-            UseOrbitCameraSampling = ConstructBoolConfig(true, ConfigSectionCamera, "5-Use orbit camera sampling", "Samples real human players from a random orbit around the chest instead of sampling from the nearest bot position", OldConfig("e - Camera Rig Settings", "Use orbit camera sampling"));
-            OrbitCameraRadius = ConstructFloatConfig(4f, ConfigSectionCamera, "6-Orbit camera radius", "Distance from the player's chest when orbit camera sampling is enabled", 0.25f, 12f, OldConfig("e - Camera Rig Settings", "Orbit camera radius"));
-            OrbitCameraHeightOffset = ConstructFloatConfig(1.5f, ConfigSectionCamera, "7-Orbit camera height offset", "Vertical offset above the player's chest when orbit camera sampling is enabled", -1f, 4f, OldConfig("e - Camera Rig Settings", "Orbit camera height offset"));
-            RejectOccludedSamples = ConstructBoolConfig(true, ConfigSectionCamera, "8-Reject occluded samples", "Skips a light camera sample when world geometry blocks the ray from the light camera to the player's chest", OldConfig("e - Camera Rig Settings", "Reject occluded samples"));
+            UseOrbitCameraSampling = ConstructBoolConfig(true, ConfigSectionCamera, "4-Use orbit camera sampling", "Samples real human players from a random orbit around the chest instead of sampling from the nearest bot position", OldConfig("e - Camera Rig Settings", "Use orbit camera sampling"), OldConfig(ConfigSectionCamera, "5-Use orbit camera sampling"));
+            OrbitCameraRadius = ConstructFloatConfig(4f, ConfigSectionCamera, "5-Orbit camera radius", "Distance from the player's chest when orbit camera sampling is enabled", 0.25f, 12f, OldConfig("e - Camera Rig Settings", "Orbit camera radius"), OldConfig(ConfigSectionCamera, "6-Orbit camera radius"));
+            OrbitCameraHeightOffset = ConstructFloatConfig(1.5f, ConfigSectionCamera, "6-Orbit camera height offset", "Vertical offset above the player's chest when orbit camera sampling is enabled", -1f, 4f, OldConfig("e - Camera Rig Settings", "Orbit camera height offset"), OldConfig(ConfigSectionCamera, "7-Orbit camera height offset"));
+            RejectOccludedSamples = ConstructBoolConfig(true, ConfigSectionCamera, "7-Reject occluded samples", "Skips a light camera sample when world geometry blocks the ray from the light camera to the player's chest", OldConfig("e - Camera Rig Settings", "Reject occluded samples"), OldConfig(ConfigSectionCamera, "8-Reject occluded samples"));
 
             // luma
             // traditional luma values : r 0.2126729, g 0.7151522, b 0.0721750
-            LumaCoef = ConstructFloatConfig(10f, ConfigSectionLuma, "1-Luma coefficient", "Multiplies the luma result", 1f, 20f, OldConfig("c - Advanced Settings", "Luma coefficient"));
+            LumaCoef = ConstructFloatConfig(15f, ConfigSectionLuma, "1-Luma coefficient", "Multiplies the luma result", 1f, 20f, OldConfig("c - Advanced Settings", "Luma coefficient"));
             RedLumaMulti = ConstructFloatConfig(1f, ConfigSectionLuma, "2-Red luma multi", "Red color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f, OldConfig("d - Color Settings", "1-Red luma multi"));
             GreenLumaMulti = ConstructFloatConfig(1f, ConfigSectionLuma, "3-Green luma multi", "Green color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f, OldConfig("d - Color Settings", "2-Green luma multi"));
             BlueLumaMulti = ConstructFloatConfig(1f, ConfigSectionLuma, "4-Blue luma multi", "Blue color in pixel analysis is multiplied by this to produce the luma calculation", 0f, 1f, OldConfig("d - Color Settings", "3-Blue luma multi"));
@@ -165,12 +163,12 @@ namespace ombarella
             ColorRenderFillIntensity = ConstructFloatConfig(0.5f, ConfigSectionColor, "4-Color render fill intensity", "Temporary camera-aligned fill light intensity used only for the color-breadth render. Luma rendering is not filled.", 0f, 8f, OldConfig(ConfigSectionColor, "1-Player profile fill intensity"), OldConfig(ConfigSectionColor, "2-Environment profile fill intensity"), OldConfig("c - Advanced Settings", "Player profile fill intensity"), OldConfig("c - Advanced Settings", "Environment profile fill intensity"));
 
             // blend
-            LumaColorDistribution = ConstructFloatConfig(GetMigratedLumaColorDistribution(0.5f), ConfigSectionBlend, "1-Luma color distribution", "Normalized final score distribution. Zero is luma only; one is color breadth only.", 0f, 1f);
+            LumaColorDistribution = ConstructFloatConfig(GetMigratedLumaColorDistribution(0.4f), ConfigSectionBlend, "1-Luma color distribution", "Normalized final score distribution. Zero is luma only; one is color breadth only.", 0f, 1f);
 
             // debug
-            IsDebug = ConstructBoolConfig(true, ConfigSectionDebug, "1-Enable debug logging", "", OldConfig("y - Debug", "1) Enable debug logging"));
+            IsDebug = ConstructBoolConfig(false, ConfigSectionDebug, "1-Enable debug logging", "", OldConfig("y - Debug", "1) Enable debug logging"));
             DebugUpdateFreq = ConstructFloatConfig(1f, ConfigSectionDebug, "2-Debug updates per second", "How frequently the debug logger updates per second", 1f, 10f, OldConfig("y - Debug", "2) Debug updates per second"));
-            ShowRenderTexturePreview = ConstructBoolConfig(true, ConfigSectionDebug, "3-Show render texture preview", "Draws the light-meter render texture in the game window for debugging", OldConfig("y - Debug", "3) Show render texture preview"));
+            ShowRenderTexturePreview = ConstructBoolConfig(false, ConfigSectionDebug, "3-Show render texture preview", "Draws the light-meter render texture in the game window for debugging", OldConfig("y - Debug", "3) Show render texture preview"));
             RenderTexturePreviewSize = ConstructFloatConfig(256f, ConfigSectionDebug, "4-Render texture preview size", "Size of the render texture debug preview in pixels", 64f, 512f, OldConfig("y - Debug", "4) Render texture preview size"));
             UseFixedOrbitAngle = ConstructBoolConfig(false, ConfigSectionDebug, "5-Use fixed orbit angle", "Uses the configured orbit angle instead of a random orbit angle for the actual light-meter sample", OldConfig("y - Debug", "5) Use fixed orbit angle"));
             FixedOrbitAngle = ConstructFloatConfig(0f, ConfigSectionDebug, "6-Fixed orbit angle", "Camera angle around the sampled player's chest when fixed orbit sampling is enabled", 0f, 360f, OldConfig("y - Debug", "6) Fixed orbit angle"));
@@ -240,6 +238,11 @@ namespace ombarella
                 "Render player only",
                 "Exclude in-hands item renderers");
             removed |= RemoveObsoleteConfigEntries(ConfigSectionCamera,
+                "4-Camera horizontal offset",
+                "5-Use orbit camera sampling",
+                "6-Orbit camera radius",
+                "7-Orbit camera height offset",
+                "8-Reject occluded samples",
                 "9-Force target player renderers",
                 "10-Exclude optic renderers");
             removed |= RemoveObsoleteConfigEntries("y - Debug",
@@ -873,7 +876,8 @@ namespace ombarella
             RenderTexture previousTargetTexture = _lightCam.targetTexture;
             _lightCam.targetTexture = targetTexture;
             bool fillLightEnabled = enableColorFill && EnableColorRenderFillLight(_lightCam);
-            FirstPersonBodyRenderScope firstPersonBodyRenderScope = CreateFirstPersonBodyRenderScope(targetPlayer);
+            MagnifiedOpticRenderScope magnifiedOpticRenderScope = CreateMagnifiedOpticRenderScope(targetPlayer);
+            FirstPersonBodyRenderScope firstPersonBodyRenderScope = CreateFirstPersonBodyRenderScope(targetPlayer, magnifiedOpticRenderScope != null ? magnifiedOpticRenderScope.HiddenRenderers : null);
 
             try
             {
@@ -886,6 +890,11 @@ namespace ombarella
                     firstPersonBodyRenderScope.Dispose();
                 }
 
+                if (magnifiedOpticRenderScope != null)
+                {
+                    magnifiedOpticRenderScope.Dispose();
+                }
+
                 if (fillLightEnabled)
                 {
                     DisableColorRenderFillLight();
@@ -895,7 +904,91 @@ namespace ombarella
             }
         }
 
-        FirstPersonBodyRenderScope CreateFirstPersonBodyRenderScope(Player targetPlayer)
+        MagnifiedOpticRenderScope CreateMagnifiedOpticRenderScope(Player targetPlayer)
+        {
+            if (!Utils.IsLightMeterUsablePlayer(targetPlayer))
+            {
+                return null;
+            }
+
+            GameObject handsObject = GetHandsControllerObject(targetPlayer);
+            if (handsObject == null)
+            {
+                return null;
+            }
+
+            HashSet<Renderer> opticRenderers = GetMagnifiedOpticRenderers(handsObject);
+            return opticRenderers.Count > 0 ? new MagnifiedOpticRenderScope(opticRenderers) : null;
+        }
+
+        GameObject GetHandsControllerObject(Player targetPlayer)
+        {
+            if (targetPlayer == null || targetPlayer.HandsController == null)
+            {
+                return null;
+            }
+
+            return targetPlayer.HandsController.ControllerGameObject;
+        }
+
+        HashSet<Renderer> GetMagnifiedOpticRenderers(GameObject handsObject)
+        {
+            HashSet<Renderer> opticRenderers = new HashSet<Renderer>();
+            if (handsObject == null)
+            {
+                return opticRenderers;
+            }
+
+            SightModVisualControllers[] sightControllers = handsObject.GetComponentsInChildren<SightModVisualControllers>(true);
+            for (int i = 0; i < sightControllers.Length; i++)
+            {
+                SightModVisualControllers sightController = sightControllers[i];
+                if (!IsMagnifiedOpticVisual(sightController))
+                {
+                    continue;
+                }
+
+                AddRenderers(sightController.gameObject, opticRenderers);
+            }
+
+            return opticRenderers;
+        }
+
+        bool IsMagnifiedOpticVisual(SightModVisualControllers sightController)
+        {
+            if (sightController == null)
+            {
+                return false;
+            }
+
+            if (sightController.TryGetZoomHandler(out ScopeZoomHandler zoomHandler) && zoomHandler != null)
+            {
+                return true;
+            }
+
+            ScopePrefabCache scopePrefabCache = sightController.GetComponent<ScopePrefabCache>();
+            return scopePrefabCache != null && scopePrefabCache.HasOptics;
+        }
+
+        void AddRenderers(GameObject rootObject, HashSet<Renderer> renderers)
+        {
+            if (rootObject == null || renderers == null)
+            {
+                return;
+            }
+
+            Renderer[] foundRenderers = rootObject.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < foundRenderers.Length; i++)
+            {
+                Renderer renderer = foundRenderers[i];
+                if (renderer != null)
+                {
+                    renderers.Add(renderer);
+                }
+            }
+        }
+
+        FirstPersonBodyRenderScope CreateFirstPersonBodyRenderScope(Player targetPlayer, HashSet<Renderer> excludedRenderers)
         {
             if (!Utils.IsLightMeterUsablePlayer(targetPlayer))
             {
@@ -904,16 +997,16 @@ namespace ombarella
 
             List<Renderer> renderers = new List<Renderer>();
             HashSet<Renderer> seenRenderers = new HashSet<Renderer>();
-            AddShadowsOnlyRenderers(targetPlayer.gameObject, renderers, seenRenderers);
+            AddShadowsOnlyRenderers(targetPlayer.gameObject, renderers, seenRenderers, excludedRenderers);
             if (targetPlayer.HandsController != null)
             {
-                AddShadowsOnlyRenderers(targetPlayer.HandsController.ControllerGameObject, renderers, seenRenderers);
+                AddShadowsOnlyRenderers(targetPlayer.HandsController.ControllerGameObject, renderers, seenRenderers, excludedRenderers);
             }
 
             return renderers.Count > 0 ? new FirstPersonBodyRenderScope(renderers) : null;
         }
 
-        void AddShadowsOnlyRenderers(GameObject rootObject, List<Renderer> renderers, HashSet<Renderer> seenRenderers)
+        void AddShadowsOnlyRenderers(GameObject rootObject, List<Renderer> renderers, HashSet<Renderer> seenRenderers, HashSet<Renderer> excludedRenderers)
         {
             if (rootObject == null)
             {
@@ -924,11 +1017,16 @@ namespace ombarella
             for (int i = 0; i < foundRenderers.Length; i++)
             {
                 Renderer renderer = foundRenderers[i];
-                if (renderer != null && renderer.shadowCastingMode == ShadowCastingMode.ShadowsOnly && seenRenderers.Add(renderer))
+                if (renderer != null && !IsExcludedRenderer(renderer, excludedRenderers) && renderer.shadowCastingMode == ShadowCastingMode.ShadowsOnly && seenRenderers.Add(renderer))
                 {
                     renderers.Add(renderer);
                 }
             }
+        }
+
+        bool IsExcludedRenderer(Renderer renderer, HashSet<Renderer> excludedRenderers)
+        {
+            return renderer != null && excludedRenderers != null && excludedRenderers.Contains(renderer);
         }
 
         bool EnableColorRenderFillLight(Camera lightCamera)
@@ -1252,6 +1350,59 @@ namespace ombarella
             public float BLumaSum;
             public float Luma;
             public float ColorBreadth;
+        }
+
+        sealed class MagnifiedOpticRenderScope : IDisposable
+        {
+            struct RendererState
+            {
+                public Renderer Renderer;
+                public bool ForceRenderingOff;
+            }
+
+            readonly List<RendererState> _rendererStates = new List<RendererState>();
+            bool _disposed;
+
+            public HashSet<Renderer> HiddenRenderers { get; private set; }
+
+            public MagnifiedOpticRenderScope(HashSet<Renderer> renderers)
+            {
+                HiddenRenderers = renderers ?? new HashSet<Renderer>();
+
+                foreach (Renderer renderer in HiddenRenderers)
+                {
+                    if (renderer == null)
+                    {
+                        continue;
+                    }
+
+                    _rendererStates.Add(new RendererState
+                    {
+                        Renderer = renderer,
+                        ForceRenderingOff = renderer.forceRenderingOff
+                    });
+                    renderer.forceRenderingOff = true;
+                }
+            }
+
+            public void Dispose()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                for (int i = _rendererStates.Count - 1; i >= 0; i--)
+                {
+                    RendererState state = _rendererStates[i];
+                    if (state.Renderer != null)
+                    {
+                        state.Renderer.forceRenderingOff = state.ForceRenderingOff;
+                    }
+                }
+
+                _disposed = true;
+            }
         }
 
         sealed class FirstPersonBodyRenderScope : IDisposable

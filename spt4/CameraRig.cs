@@ -67,7 +67,6 @@ namespace ombarella
                 return false;
             }
 
-            observerToFocus = Vector3.ClampMagnitude(observerToFocus, Plugin.CamHorizontalOffset.Value);
             Vector3 cameraPosition = focusPoint - observerToFocus;
             _lightCam.gameObject.transform.position = cameraPosition;
             _lightCam.gameObject.transform.rotation = Quaternion.LookRotation(focusPoint - cameraPosition);

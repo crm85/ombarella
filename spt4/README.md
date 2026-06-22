@@ -25,7 +25,7 @@ release\BepInEx\plugins\Ombarella\
 The packaged build is:
 
 ```text
-release\ombarella-spt4-0.4.3.zip
+release\ombarella-spt4-0.5.1.zip
 ```
 
 This build accepts either `Ombarella\shader` or `Ombarella\ombhistogram` as the compute shader bundle name.
