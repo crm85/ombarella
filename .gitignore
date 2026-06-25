@@ -9,6 +9,6 @@ fika/
 *.suo
 *.vsidx
 
-release/*.zip
-release/*.7z
-release/4.0/
+**/release/*.zip
+**/release/*.7z
+!spt-4.0/release/ombarella-spt4-0.5.1.zip
